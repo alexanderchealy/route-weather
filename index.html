@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>101 Travel Day Planner</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --bg:#f6f5f1; --card:#ffffff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e3e1da;
+    --dry:#2e9e5b; --possible:#b8a12a; --light:#5aa0e6; --moderate:#2f62c9; --heavy:#b3261e; --nodata:#a9a7a0;
+    --accent:#1d1d1b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#161614; --card:#21211e; --ink:#f0efe9; --muted:#a3a29b; --line:#34332f; --accent:#f0efe9; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.4}
+  header{padding:16px 16px 8px}
+  h1{font-size:20px;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:13px}
+  main{padding:0 12px 40px;max-width:960px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
+  .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+  .seg button{flex:1;border:0;background:transparent;color:var(--ink);padding:9px 6px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+  .seg button.on{background:var(--accent);color:var(--bg)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+  input,select{width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-size:15px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+  .btn{border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:8px 12px;border-radius:9px;font-size:14px;cursor:pointer}
+  .tiny{font-size:12px;color:var(--muted)}
+  h2{font-size:14px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  .day{flex:0 0 auto;min-width:74px;border:1px solid var(--line);border-radius:10px;padding:7px 8px;text-align:center;cursor:pointer;background:var(--bg)}
+  .day.on{outline:2px solid var(--accent)}
+  .day .dw{font-weight:700;font-size:13px}
+  .day .dd{font-size:12px;color:var(--muted)}
+  .day .bar{height:6px;border-radius:3px;margin:6px 0 4px}
+  .day .bt{font-size:11px;color:var(--muted)}
+  .hours{display:flex;align-items:flex-end;gap:4px;height:96px;overflow-x:auto}
+  .hr{flex:1 0 34px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer}
+  .hr .b{width:100%;border-radius:5px 5px 2px 2px;min-height:4px}
+  .hr .l{font-size:11px;color:var(--muted);margin-top:4px}
+  .hr.on .l{color:var(--ink);font-weight:700}
+  .hr.on .b{outline:2px solid var(--accent)}
+  .verdict{font-size:17px;font-weight:700;margin-bottom:4px}
+  .stats{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .stats b{color:var(--ink)}
+  .conf{display:inline-block;font-size:12px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);margin-top:6px}
+  #map{height:58vh;min-height:340px;border-radius:14px;border:1px solid var(--line);margin:10px 0}
+  .alerts .a{border-left:4px solid var(--heavy);padding:6px 10px;margin:6px 0;background:var(--bg);border-radius:6px;font-size:13px}
+  .tl{list-style:none;margin:0;padding:0}
+  .tl li{display:grid;grid-template-columns:64px 14px 1fr auto;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+  .tl li:last-child{border-bottom:0}
+  .dot{width:14px;height:14px;border-radius:50%}
+  .tl .t{font-weight:700;font-size:14px}
+  .tl .n{font-weight:600}
+  .tl .x{font-size:12px;color:var(--muted)}
+  .tl .w{text-align:right;font-size:13px}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .tt{font-size:11px;padding:2px 5px;border-radius:5px}
+  .leaflet-popup-content{margin:10px 12px;font-size:13px}
+  .pp b{font-size:14px}
+  .pp button{margin-top:6px;width:100%}
+  #sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:2000}
+  #sheet.open{display:flex}
+  #sheet .panel{background:var(--card);color:var(--ink);width:100%;max-width:640px;max-height:85vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
+  .hrow{display:grid;grid-template-columns:52px 1fr 92px;gap:8px;align-items:center;font-size:13px;padding:3px 0}
+  .hrow.eta{font-weight:700}
+  .hrow .track{height:12px;background:var(--bg);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  .hrow .fill{height:100%}
+  .note{font-size:13px;color:var(--muted);margin:4px 0 10px}
+  .err{color:var(--heavy);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>101 Travel Day Planner</h1>
+  <div class="sub">Berkeley and Thousand Oaks via US-101, with live hourly forecasts timed to when you reach each town.</div>
+</header>
+<main>
+
+  <div class="card">
+    <div class="seg" id="dirSeg">
+      <button data-dir="south">To Thousand Oaks</button>
+      <button data-dir="north">Back to Berkeley</button>
+    </div>
+    <div class="grid">
+      <div><label for="date">Departure date</label><input type="date" id="date"></div>
+      <div><label for="time">Departure time</label><input type="time" id="time" step="900"></div>
+      <div><label for="speed">Average speed</label>
+        <select id="speed">
+          <option value="45">45 mph, heavy traffic</option>
+          <option value="50">50 mph</option>
+          <option value="55">55 mph, typical holiday</option>
+          <option value="60">60 mph</option>
+          <option value="65">65 mph, open road</option>
+        </select></div>
+      <div><label for="breaks">Rest breaks</label>
+        <select id="breaks">
+          <option value="0-0">No breaks</option>
+          <option value="60-10">10 min every hour</option>
+          <option value="60-15">15 min every hour</option>
+          <option value="90-10">10 min every 90 min</option>
+          <option value="90-15">15 min every 90 min</option>
+          <option value="90-30">30 min every 90 min</option>
+          <option value="120-15">15 min every 2 hrs</option>
+          <option value="120-20">20 min every 2 hrs</option>
+          <option value="120-30">30 min every 2 hrs</option>
+          <option value="150-20">20 min every 2.5 hrs</option>
+          <option value="180-15">15 min every 3 hrs</option>
+          <option value="180-30">30 min every 3 hrs</option>
+          <option value="240-30">30 min every 4 hrs</option>
+          <option value="custom">Custom…</option>
+        </select></div>
+      <div><label for="meal">Meal stop in San Luis Obispo</label>
+        <select id="meal">
+          <option value="0">No meal stop</option>
+          <option value="20">20 min, quick bite</option>
+          <option value="30">30 min</option>
+          <option value="45">45 min</option>
+          <option value="60">1 hr, sit-down meal</option>
+          <option value="90">1.5 hrs</option>
+          <option value="120">2 hrs, explore town</option>
+        </select></div>
+    </div>
+    <div class="grid" id="customBrk" style="display:none">
+      <div><label for="brkEvery">Stop every (minutes of driving)</label><input type="number" id="brkEvery" min="15" max="480" step="5" inputmode="numeric"></div>
+      <div><label for="brkLen">Break length (minutes)</label><input type="number" id="brkLen" min="0" max="180" step="5" inputmode="numeric"></div>
+    </div>
+    <div class="row">
+      <span class="tiny" id="updated">Loading forecasts</span>
+      <button class="btn" id="refresh">Refresh</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Best departure each day</h2>
+    <div class="strip" id="days"></div>
+    <div class="tiny" style="margin-top:6px">Each day shows the driest departure between 6 am and 1 pm. Tap a day to load it.</div>
+  </div>
+
+  <div class="card">
+    <h2>Rain along the route by departure time</h2>
+    <div class="hours" id="hours"></div>
+    <div class="tiny" style="margin-top:6px">Taller bars mean more rain where you would be. Tap a bar to depart then.</div>
+  </div>
+
+  <div class="card" id="summary"></div>
+  <div class="card alerts" id="alerts" style="display:none"></div>
+
+  <div id="map"></div>
+  <div class="legend">
+    <span><i style="background:var(--dry)"></i>Dry</span>
+    <span><i style="background:var(--possible)"></i>Rain possible</span>
+    <span><i style="background:var(--light)"></i>Light</span>
+    <span><i style="background:var(--moderate)"></i>Moderate</span>
+    <span><i style="background:var(--heavy)"></i>Heavy</span>
+  </div>
+
+  <div class="card">
+    <h2>Timeline</h2>
+    <ul class="tl" id="timeline"></ul>
+  </div>
+
+  <p class="tiny">Forecasts from Open-Meteo, alerts from the National Weather Service, map &copy; OpenStreetMap contributors. Mileage and arrival times are estimates. Forecasts more than five days out are rough guides, not plans.</p>
+</main>
+
+<div id="sheet"><div class="panel" id="sheetPanel"></div></div>
+
+<script>
+
+const CITIES = [
+  {id:"start", name:"Berkeley", lat:37.8712, lon:-122.2741, mi:0, major:true},
+  {id:"oakland", name:"Oakland", lat:37.8044, lon:-122.2712, mi:5},
+  {id:"hayward", name:"Hayward", lat:37.6688, lon:-122.0808, mi:22},
+  {id:"fremont", name:"Fremont", lat:37.5485, lon:-121.9886, mi:33},
+  {id:"sanjose", name:"San Jose", lat:37.3382, lon:-121.8863, mi:45, major:true},
+  {id:"morganhill", name:"Morgan Hill", lat:37.1305, lon:-121.6544, mi:65},
+  {id:"gilroy", name:"Gilroy", lat:37.0058, lon:-121.5683, mi:76},
+  {id:"salinas", name:"Salinas", lat:36.6777, lon:-121.6555, mi:106, major:true},
+  {id:"soledad", name:"Soledad", lat:36.4247, lon:-121.3263, mi:131},
+  {id:"kingcity", name:"King City", lat:36.2127, lon:-121.1260, mi:153, major:true},
+  {id:"paso", name:"Paso Robles", lat:35.6266, lon:-120.6910, mi:204, major:true},
+  {id:"atascadero", name:"Atascadero", lat:35.4894, lon:-120.6707, mi:214, note:"Cuesta Grade starts south of here. It is a short climb and descent, and it can be slick in rain."},
+  {id:"slo", name:"San Luis Obispo", lat:35.2828, lon:-120.6596, mi:232, major:true, note:"A natural halfway stop if you want to split the drive."},
+  {id:"pismo", name:"Pismo Beach", lat:35.1428, lon:-120.6413, mi:243},
+  {id:"santamaria", name:"Santa Maria", lat:34.9530, lon:-120.4357, mi:262},
+  {id:"buellton", name:"Buellton", lat:34.6136, lon:-120.1927, mi:288},
+  {id:"gaviota", name:"Gaviota", lat:34.4719, lon:-120.2281, mi:300, note:"Gaviota Pass and the coast can be windy. Watch the gust numbers here."},
+  {id:"goleta", name:"Goleta", lat:34.4358, lon:-119.8276, mi:325},
+  {id:"sb", name:"Santa Barbara", lat:34.4208, lon:-119.6982, mi:333, major:true},
+  {id:"carp", name:"Carpinteria", lat:34.3989, lon:-119.5185, mi:344},
+  {id:"ventura", name:"Ventura", lat:34.2746, lon:-119.2290, mi:361, major:true},
+  {id:"camarillo", name:"Camarillo", lat:34.2164, lon:-119.0376, mi:376, note:"Conejo Grade climbs from here toward Thousand Oaks."},
+  {id:"end", name:"Thousand Oaks", lat:34.1706, lon:-118.8376, mi:391, major:true}
+];
+const TOTAL = CITIES[CITIES.length-1].mi;
+const ALERT_POINTS = ["start","sanjose","salinas","paso","slo","sb","ventura","end"];
+
+const WMO = {0:["Clear","☀️"],1:["Mostly clear","🌤️"],2:["Partly cloudy","⛅"],3:["Overcast","☁️"],45:["Fog","🌫️"],48:["Freezing fog","🌫️"],
+  51:["Light drizzle","🌦️"],53:["Drizzle","🌦️"],55:["Heavy drizzle","🌧️"],56:["Freezing drizzle","🌧️"],57:["Freezing drizzle","🌧️"],
+  61:["Light rain","🌦️"],63:["Rain","🌧️"],65:["Heavy rain","🌧️"],66:["Freezing rain","🌧️"],67:["Freezing rain","🌧️"],
+  71:["Light snow","🌨️"],73:["Snow","🌨️"],75:["Heavy snow","❄️"],77:["Snow grains","🌨️"],
+  80:["Light showers","🌦️"],81:["Showers","🌧️"],82:["Violent showers","⛈️"],85:["Snow showers","🌨️"],86:["Snow showers","🌨️"],
+  95:["Thunderstorm","⛈️"],96:["Thunderstorm, hail","⛈️"],99:["Thunderstorm, hail","⛈️"]};
+const CAT = {
+  dry:{label:"Dry",color:"var(--dry)",hex:"#2e9e5b"},
+  possible:{label:"Rain possible",color:"var(--possible)",hex:"#b8a12a"},
+  light:{label:"Light rain",color:"var(--light)",hex:"#5aa0e6"},
+  moderate:{label:"Moderate rain",color:"var(--moderate)",hex:"#2f62c9"},
+  heavy:{label:"Heavy rain",color:"var(--heavy)",hex:"#b3261e"},
+  nodata:{label:"No forecast yet",color:"var(--nodata)",hex:"#a9a7a0"}
+};
+
+let wx = null, times = [], tIndex = {}, alerts = [], alertsStatus = "";
+let map, markerLayer;
+
+function todayLocal(){ return new Date(nowLocalNaive()).toISOString().slice(0,10); }
+const defaults = {dir:"south", date:null, time:"08:00", speed:"55", breaks:"90-15", brkEvery:"90", brkLen:"15", meal:"0"};
+let state = Object.assign({}, defaults);
+try { const s = JSON.parse(localStorage.getItem("route101") || "null"); if (s) state = Object.assign(state, s); } catch(e){}
+if (!state.date || state.date < todayLocal()) state.date = todayLocal();
+function save(){ try { localStorage.setItem("route101", JSON.stringify(state)); } catch(e){} }
+/* Keep the chosen date inside the window the live forecast actually covers. */
+function clampDate(){
+  if (!times.length) return;
+  const lo = times[0].slice(0,10), hi = times[times.length-1].slice(0,10);
+  const today = todayLocal();
+  const min = today > lo ? today : lo;
+  if (state.date < min) state.date = min;
+  if (state.date > hi) state.date = hi;
+}
+function breakPlan(){
+  if (state.breaks === "custom") return [Number(state.brkEvery) || 0, Number(state.brkLen) || 0];
+  return state.breaks.split("-").map(Number);
+}
+const MEAL_AT = "slo";
+
+const $ = id => document.getElementById(id);
+
+function depMs(date, time){
+  const [y,m,d] = date.split("-").map(Number);
+  const [hh,mm] = time.split(":").map(Number);
+  return Date.UTC(y, m-1, d, hh, mm);
+}
+function keyFor(ms){ return new Date(ms).toISOString().slice(0,13) + ":00"; }
+function fmtTime(ms){
+  const d = new Date(ms); let h = d.getUTCHours(); const m = d.getUTCMinutes();
+  const ap = h < 12 ? "am" : "pm"; h = h % 12 || 12;
+  return h + ":" + String(m).padStart(2,"0") + " " + ap;
+}
+function fmtDay(ms){
+  return new Date(ms).toLocaleDateString("en-US",{weekday:"short", month:"short", day:"numeric", timeZone:"UTC"});
+}
+function fmtDur(min){ const t = Math.round(min), h = Math.floor(t/60), m = t % 60; return h ? h + " hr " + m + " min" : m + " min"; }
+function nowLocalNaive(){
+  const parts = new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
+  const g = t => Number(parts.find(p=>p.type===t).value);
+  return Date.UTC(g("year"), g("month")-1, g("day"), g("hour"), g("minute"));
+}
+
+function category(p, prob){
+  if (p == null) return "nodata";
+  if (p >= 0.15) return "heavy";
+  if (p >= 0.04) return "moderate";
+  if (p >= 0.005) return "light";
+  if (prob != null && prob >= 40) return "possible";
+  return "dry";
+}
+
+function orderedCities(dir){ return dir === "south" ? CITIES.slice() : CITIES.slice().reverse(); }
+
+function computeStops(dep, dir, speed){
+  const [every, len] = breakPlan();
+  const meal = Number(state.meal) || 0;
+  const mealC = CITIES.find(c => c.id === MEAL_AT);
+  const mealMiles = dir === "south" ? mealC.mi : TOTAL - mealC.mi;
+  return orderedCities(dir).map(c => {
+    const miles = dir === "south" ? c.mi : TOTAL - c.mi;
+    const drive = miles / speed * 60;
+    // Breaks taken strictly before reaching this stop (none exactly on arrival).
+    const nBrk = every > 0 && len > 0 ? Math.max(0, Math.ceil(drive / every) - 1) : 0;
+    const brk = nBrk * len + (meal && miles > mealMiles ? meal : 0);
+    const eta = dep + (drive + brk) * 60000;
+    const ci = CITIES.indexOf(c);
+    const idx = tIndex[keyFor(eta)];
+    let w = null;
+    if (wx && idx != null && wx[ci]) {
+      const h = wx[ci];
+      w = {p:h.precipitation[idx], prob:h.precipitation_probability[idx], code:h.weather_code[idx],
+           temp:h.temperature_2m[idx], wind:h.wind_speed_10m[idx], gust:h.wind_gusts_10m[idx], vis:h.visibility[idx]};
+      if (w.p == null && w.code == null) w = null;
+    }
+    return {c, ci, miles, eta, drive, idx, w, nBrk, cat: w ? category(w.p, w.prob) : "nodata"};
+  });
+}
+const num = (v, d) => v == null || isNaN(v) ? "–" : Number(v).toFixed(d);
+
+function routeScore(stops){
+  let s = 0;
+  for (const st of stops) {
+    if (!st.w || st.w.p == null) return null;
+    s += st.w.p + (st.cat === "heavy" ? 0.2 : 0) + (st.cat === "possible" ? 0.003 : 0);
+  }
+  return s;
+}
+function scoreCat(s){
+  if (s == null) return "nodata";
+  if (s < 0.005) return "dry";
+  if (s < 0.08) return "light";
+  if (s < 0.4) return "moderate";
+  return "heavy";
+}
+
+/* ---------- map ---------- */
+function initMap(){
+  map = L.map("map", {zoomControl:true}).setView([36.0, -120.6], 6);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+  markerLayer = L.layerGroup().addTo(map);
+}
+
+let routeLayer = null;
+async function drawRoute(){
+  const via = ["start","sanjose","salinas","slo","sb","end"].map(id => CITIES.find(c => c.id === id));
+  const coords = via.map(c => c.lon + "," + c.lat).join(";");
+  if (routeLayer) map.removeLayer(routeLayer);
+  try {
+    const r = await fetchTimeout("https://router.project-osrm.org/route/v1/driving/" + coords + "?overview=full&geometries=geojson", 8000);
+    const j = await r.json();
+    routeLayer = L.geoJSON(j.routes[0].geometry, {style:{color:"#555", weight:4, opacity:.7}}).addTo(map);
+  } catch(e) {
+    routeLayer = L.polyline(CITIES.map(c => [c.lat, c.lon]), {color:"#555", weight:4, opacity:.6, dashArray:"6 6"}).addTo(map);
+  }
+  map.fitBounds(routeLayer.getBounds(), {padding:[20,20]});
+}
+
+function fetchTimeout(url, ms){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  return fetch(url, {signal: ctl.signal}).then(r => { clearTimeout(t); if (!r.ok) throw new Error(r.status); return r; });
+}
+
+
+/* ---------- data ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function forecastUrl(cities){
+  return "https://api.open-meteo.com/v1/forecast?latitude=" + cities.map(c => c.lat.toFixed(4)).join(",") +
+    "&longitude=" + cities.map(c => c.lon.toFixed(4)).join(",") +
+    "&hourly=temperature_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m,visibility" +
+    "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FLos_Angeles&forecast_days=16";
+}
+/* Fetch one batch of locations, retrying transient failures (network, 429, 5xx). */
+async function fetchForecast(cities){
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetchTimeout(forecastUrl(cities), 20000);
+      let j = await r.json();
+      if (j && j.error) throw new Error(j.reason || "Open-Meteo error");
+      if (!Array.isArray(j)) j = [j];
+      if (j.length !== cities.length || !j[0].hourly) throw new Error("Unexpected forecast response");
+      return j.map(d => d.hourly);
+    } catch(e) {
+      lastErr = e;
+      if (/^4\d\d$/.test(e.message) && e.message !== "429") break;
+      await sleep(800 * Math.pow(2, attempt));
+    }
+  }
+  throw lastErr;
+}
+let loadingWx = false, wxLoadedAt = 0;
+async function loadWeather(){
+  if (loadingWx) return;
+  loadingWx = true;
+  $("updated").textContent = "Loading live forecasts";
+  try {
+    let data;
+    try { data = await fetchForecast(CITIES); }
+    catch(e) {
+      // Fall back to smaller batches in case the single large request is what failed.
+      const chunks = [];
+      for (let i = 0; i < CITIES.length; i += 6) chunks.push(CITIES.slice(i, i + 6));
+      data = (await Promise.all(chunks.map(fetchForecast))).flat();
+    }
+    wx = data;
+    times = wx[0].time;
+    tIndex = {}; times.forEach((t,i) => tIndex[t] = i);
+    $("date").min = todayLocal() > times[0].slice(0,10) ? todayLocal() : times[0].slice(0,10);
+    $("date").max = times[times.length-1].slice(0,10);
+    clampDate(); save();
+    wxLoadedAt = Date.now();
+    $("updated").textContent = "Live forecast updated " + new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+  } catch(e) {
+    const why = e.name === "AbortError" ? "the request timed out" :
+      e instanceof TypeError ? "the browser blocked or could not reach api.open-meteo.com" :
+      e.message === "429" ? "the forecast service is rate-limiting requests, try again in a minute" : "error " + e.message;
+    $("updated").innerHTML = '<span class="err">Could not load live forecasts (' + why + '). ' +
+      (wx ? 'Showing the last forecast. ' : '') + 'Tap Refresh to retry.</span>';
+    if (e instanceof TypeError && location.protocol === "file:") $("updated").innerHTML += ' <span class="tiny">If this keeps happening, open the file in Safari or Chrome rather than a preview window.</span>';
+  } finally { loadingWx = false; }
+  render();
+}
+/* Keep the forecast live: refresh every 30 minutes and when the tab comes back. */
+setInterval(() => { if (!document.hidden) { loadWeather(); loadAlerts(); } }, 30 * 60000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && Date.now() - wxLoadedAt > 15 * 60000) { loadWeather(); loadAlerts(); }
+});
+
+async function loadAlerts(){
+  const seen = new Map();
+  alertsStatus = "";
+  await Promise.all(ALERT_POINTS.map(async id => {
+    const c = CITIES.find(x => x.id === id);
+    try {
+      const r = await fetchTimeout("https://api.weather.gov/alerts/active?point=" + c.lat.toFixed(4) + "," + c.lon.toFixed(4), 10000);
+      const j = await r.json();
+      for (const f of (j.features || [])) {
+        const p = f.properties;
+        if (!seen.has(p.event + p.areaDesc)) seen.set(p.event + p.areaDesc, {event:p.event, area:p.areaDesc, ends:p.ends || p.expires, near:c.name, severity:p.severity});
+      }
+    } catch(e) { alertsStatus = "Some alert checks did not load."; }
+  }));
+  alerts = [...seen.values()];
+  renderAlerts();
+}
+
+/* ---------- render ---------- */
+function render(){
+  document.querySelectorAll("#dirSeg button").forEach(b => b.classList.toggle("on", b.dataset.dir === state.dir));
+  $("date").value = state.date; $("time").value = state.time;
+  $("speed").value = state.speed; $("breaks").value = state.breaks;
+  $("brkEvery").value = state.brkEvery; $("brkLen").value = state.brkLen; $("meal").value = state.meal;
+  $("customBrk").style.display = state.breaks === "custom" ? "grid" : "none";
+  const dep = depMs(state.date, state.time);
+  const stops = computeStops(dep, state.dir, Number(state.speed));
+  renderDays(); renderHours(); renderSummary(stops, dep); renderMarkers(stops); renderTimeline(stops);
+}
+
+function renderDays(){
+  const el = $("days"); el.innerHTML = "";
+  if (!wx) { el.innerHTML = '<span class="tiny">Waiting for forecasts</span>'; return; }
+  const dates = [...new Set(times.map(t => t.slice(0,10)))];
+  for (const d of dates) {
+    let best = null, bestT = null;
+    for (let h = 6; h <= 13; h++) {
+      const t = String(h).padStart(2,"0") + ":00";
+      const s = routeScore(computeStops(depMs(d, t), state.dir, Number(state.speed)));
+      if (s != null && (best == null || s < best)) { best = s; bestT = t; }
+    }
+    const div = document.createElement("div");
+    div.className = "day" + (d === state.date ? " on" : "");
+    const ms = depMs(d, "12:00");
+    const cat = scoreCat(best);
+    div.innerHTML = '<div class="dw">' + new Date(ms).toLocaleDateString("en-US",{weekday:"short",timeZone:"UTC"}) + '</div>' +
+      '<div class="dd">' + new Date(ms).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"}) + '</div>' +
+      '<div class="bar" style="background:' + CAT[cat].color + '"></div>' +
+      '<div class="bt">' + (bestT ? fmtTime(depMs(d, bestT)) + "<br>" + (cat === "nodata" ? "" : CAT[cat].label.replace(" rain","")) : "Out of range") + '</div>';
+    div.onclick = () => { state.date = d; if (bestT) state.time = bestT; save(); render(); };
+    el.appendChild(div);
+  }
+}
+
+function renderHours(){
+  const el = $("hours"); el.innerHTML = "";
+  if (!wx) return;
+  const rows = [];
+  for (let h = 4; h <= 16; h++) {
+    const t = String(h).padStart(2,"0") + ":00";
+    rows.push({t, s: routeScore(computeStops(depMs(state.date, t), state.dir, Number(state.speed)))});
+  }
+  const max = Math.max(0.05, ...rows.map(r => r.s || 0));
+  const selH = state.time.slice(0,2) + ":00";
+  for (const r of rows) {
+    const d = document.createElement("div");
+    d.className = "hr" + (r.t === selH ? " on" : "");
+    const pct = r.s == null ? 4 : Math.max(5, r.s / max * 100);
+    const lab = fmtTime(depMs("2000-01-01", r.t)).replace(":00","").replace(" ","");
+    d.innerHTML = '<div class="b" style="height:' + pct + '%;background:' + CAT[scoreCat(r.s)].color + '"></div><div class="l">' + lab + '</div>';
+    d.onclick = () => { state.time = r.t; save(); render(); };
+    el.appendChild(d);
+  }
+}
+
+function renderSummary(stops, dep){
+  const el = $("summary");
+  const last = stops[stops.length-1];
+  const totalMin = (last.eta - dep) / 60000;
+  const stopMin = totalMin - last.drive;
+  const counts = {dry:0, possible:0, light:0, moderate:0, heavy:0, nodata:0};
+  stops.forEach(s => counts[s.cat]++);
+  let maxP = 0, maxAt = null, maxGust = 0, gustAt = null;
+  stops.forEach(s => { if (s.w) {
+    if (s.w.p > maxP) { maxP = s.w.p; maxAt = s.c.name; }
+    if (s.w.gust > maxGust) { maxGust = s.w.gust; gustAt = s.c.name; }
+  }});
+  let verdict;
+  if (!wx) verdict = "Waiting for forecasts";
+  else if (counts.nodata === stops.length) verdict = "This trip is beyond the forecast range";
+  else if (counts.heavy) verdict = "Heavy rain expected near " + stops.filter(s => s.cat === "heavy").map(s => s.c.name).slice(0,3).join(", ");
+  else if (counts.moderate) verdict = "Moderate rain on part of the route";
+  else if (counts.light) verdict = "Light rain on part of the route";
+  else if (counts.possible) verdict = "Mostly dry, with some chance of showers";
+  else verdict = "Dry the whole way";
+  const lead = (dep - nowLocalNaive()) / 86400000;
+  let conf = lead <= 2 ? "Forecast confidence is good" : lead <= 5 ? "Forecast confidence is moderate, expect changes" : "Forecast confidence is low, this will change";
+  if (lead < -0.1) conf = "This departure time has passed";
+  el.innerHTML = '<div class="verdict">' + verdict + '</div>' +
+    '<div class="stats">' +
+    '<span>Leave <b>' + fmtDay(dep) + ', ' + fmtTime(dep) + '</b></span>' +
+    '<span>Arrive <b>' + fmtTime(last.eta) + '</b></span>' +
+    '<span>About <b>' + fmtDur(totalMin) + '</b>, ' + TOTAL + ' mi</span>' +
+    (stopMin > 0 ? '<span>Stops <b>' + fmtDur(stopMin) + '</b> (' + [last.nBrk ? last.nBrk + ' rest break' + (last.nBrk > 1 ? 's' : '') : '', Number(state.meal) ? 'meal in SLO' : ''].filter(Boolean).join(' + ') + ')</span>' : '') +
+    (wx ? '<span>Dry stops <b>' + (counts.dry + counts.possible) + ' of ' + stops.length + '</b></span>' : '') +
+    (maxP > 0 ? '<span>Most rain <b>' + num(maxP,2) + ' in/hr</b> near ' + maxAt + '</span>' : '') +
+    (maxGust >= 30 ? '<span>Gusts to <b>' + Math.round(maxGust) + ' mph</b> near ' + gustAt + '</span>' : '') +
+    '</div><span class="conf">' + conf + '</span>';
+}
+
+function renderAlerts(){
+  const el = $("alerts");
+  if (!alerts.length) {
+    el.style.display = "block";
+    el.innerHTML = '<h2>Weather alerts</h2><div class="tiny">No active National Weather Service alerts along the route right now.' + (alertsStatus ? " " + alertsStatus : "") + '</div>';
+    return;
+  }
+  el.style.display = "block";
+  el.innerHTML = '<h2>Weather alerts, active now</h2>' + alerts.map(a =>
+    '<div class="a"><b>' + a.event + '</b> near ' + a.near + '<br><span class="tiny">' + a.area +
+    (a.ends ? ". Until " + new Date(a.ends).toLocaleString("en-US",{weekday:"short",hour:"numeric",minute:"2-digit",timeZone:"America/Los_Angeles"}) : "") + '</span></div>').join("");
+}
+
+function wLine(w){
+  if (!w) return "No forecast for this hour yet";
+  const [desc, icon] = WMO[w.code] || ["", ""];
+  return icon + " " + desc + ", " + Math.round(w.temp) + "°F, " + num(w.p,2) + " in/hr, " + (w.prob ?? "–") + "% chance";
+}
+
+function renderMarkers(stops){
+  markerLayer.clearLayers();
+  for (const s of stops) {
+    const col = CAT[s.cat].hex;
+    const m = L.circleMarker([s.c.lat, s.c.lon], {radius: s.c.major ? 9 : 6, color:"#fff", weight:2, fillColor:col, fillOpacity:1});
+    const icon = s.w ? (WMO[s.w.code] || ["",""])[1] : "";
+    if (s.c.major) m.bindTooltip(fmtTime(s.eta) + " " + icon, {permanent:true, direction:"right", className:"tt", offset:[8,0]});
+    m.bindPopup('<div class="pp"><b>' + s.c.name + '</b><br>Arrive about ' + fmtTime(s.eta) + ', mile ' + Math.round(s.miles) + '<br>' + wLine(s.w) +
+      (s.w ? '<br>Wind ' + Math.round(s.w.wind) + ' mph, gusts ' + Math.round(s.w.gust) : '') +
+      '<br><button class="btn" data-detail="' + s.ci + '">Hour by hour</button></div>');
+    m.addTo(markerLayer);
+  }
+}
+
+function renderTimeline(stops){
+  const el = $("timeline"); el.innerHTML = "";
+  for (const s of stops) {
+    const li = document.createElement("li");
+    const [desc, icon] = s.w ? (WMO[s.w.code] || ["",""]) : ["",""];
+    li.innerHTML = '<span class="t">' + fmtTime(s.eta) + '</span><span class="dot" style="background:' + CAT[s.cat].color + '"></span>' +
+      '<span><div class="n">' + s.c.name + '</div><div class="x">' + CAT[s.cat].label + (s.w && s.w.prob != null ? ", " + s.w.prob + "% chance" : "") + '</div></span>' +
+      '<span class="w">' + (s.w ? icon + " " + Math.round(s.w.temp) + "°<br><span class='x'>" + num(s.w.p,2) + " in</span>" : "") + '</span>';
+    li.onclick = () => openDetail(s.ci);
+    el.appendChild(li);
+  }
+}
+
+function openDetail(ci){
+  const c = CITIES[ci];
+  const dep = depMs(state.date, state.time);
+  const st = computeStops(dep, state.dir, Number(state.speed)).find(s => s.ci === ci);
+  const etaKey = keyFor(st.eta);
+  const day = etaKey.slice(0,10);
+  let rows = "";
+  if (wx) {
+    const h = wx[ci];
+    for (let hr = 5; hr <= 22; hr++) {
+      const k = day + "T" + String(hr).padStart(2,"0") + ":00";
+      const i = tIndex[k]; if (i == null) continue;
+      const p = h.precipitation[i] ?? 0, prob = h.precipitation_probability[i];
+      const cat = category(p, prob);
+      const width = Math.min(100, p / 0.2 * 100);
+      const [desc, icon] = WMO[h.weather_code[i]] || ["",""];
+      rows += '<div class="hrow' + (k === etaKey ? ' eta' : '') + '"><span>' + fmtTime(depMs(day, String(hr).padStart(2,"0") + ":00")).replace(":00","") + '</span>' +
+        '<div class="track"><div class="fill" style="width:' + Math.max(p > 0 ? 4 : 0, width) + '%;background:' + CAT[cat].color + '"></div></div>' +
+        '<span>' + icon + ' ' + num(p,2) + ' in, ' + (prob ?? '–') + '%</span></div>';
+    }
+  }
+  $("sheetPanel").innerHTML = '<div class="row" style="margin-top:0"><h1 style="font-size:18px;margin:0">' + c.name + '</h1><button class="btn" id="closeSheet">Close</button></div>' +
+    '<div class="note">You arrive about ' + fmtTime(st.eta) + ' on ' + fmtDay(st.eta) + '. ' + wLine(st.w) + (st.w ? '. Wind ' + Math.round(st.w.wind) + ' mph, gusts ' + Math.round(st.w.gust) + ', visibility ' + num(st.w.vis/1609,1) + ' mi.' : '') + '</div>' +
+    (c.note ? '<div class="note">' + c.note + '</div>' : '') +
+    '<h2>Hour by hour, ' + fmtDay(st.eta) + '</h2>' + (rows || '<div class="tiny">No forecast for this day yet.</div>') +
+    '<div class="tiny" style="margin-top:8px">Bold row is when you pass through. A full bar is 0.2 inches per hour, which is heavy rain.</div>';
+  $("sheet").classList.add("open");
+  $("closeSheet").onclick = closeDetail;
+}
+function closeDetail(){ $("sheet").classList.remove("open"); }
+
+/* ---------- events ---------- */
+document.querySelectorAll("#dirSeg button").forEach(b => b.onclick = () => { state.dir = b.dataset.dir; save(); render(); });
+$("date").onchange = e => { if (e.target.value) { state.date = e.target.value; save(); render(); } };
+$("time").onchange = e => { if (e.target.value) { state.time = e.target.value; save(); render(); } };
+$("speed").onchange = e => { state.speed = e.target.value; save(); render(); };
+$("breaks").onchange = e => { state.breaks = e.target.value; save(); render(); };
+$("brkEvery").onchange = e => { state.brkEvery = e.target.value; save(); render(); };
+$("brkLen").onchange = e => { state.brkLen = e.target.value; save(); render(); };
+$("meal").onchange = e => { state.meal = e.target.value; save(); render(); };
+$("refresh").onclick = () => { loadWeather(); loadAlerts(); };
+$("sheet").onclick = e => { if (e.target.id === "sheet") closeDetail(); };
+document.addEventListener("click", e => { const b = e.target.closest("[data-detail]"); if (b) { map.closePopup(); openDetail(Number(b.dataset.detail)); } });
+
+(async function init(){
+  initMap();
+  render();
+  drawRoute();
+  await loadWeather();
+  loadAlerts();
+})();
+</script>
+</body>
+</html>
