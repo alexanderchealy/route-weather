@@ -361,7 +361,7 @@ async function fetchForecast(cities){
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const r = await fetchTimeout(forecastUrl(cities), 20000);
+      const r = await fetchTimeout(forecastUrl(cities), 30000);
       let j = await r.json();
       if (j && j.error) throw new Error(j.reason || "Open-Meteo error");
       if (!Array.isArray(j)) j = [j];
@@ -381,14 +381,11 @@ async function loadWeather(){
   loadingWx = true;
   $("updated").textContent = "Loading live forecasts";
   try {
-    let data;
-    try { data = await fetchForecast(CITIES); }
-    catch(e) {
-      // Fall back to smaller batches in case the single large request is what failed.
-      const chunks = [];
-      for (let i = 0; i < CITIES.length; i += 6) chunks.push(CITIES.slice(i, i + 6));
-      data = (await Promise.all(chunks.map(fetchForecast))).flat();
-    }
+    // Fetch in parallel batches: one uncached 23-town request can take Open-Meteo 20+ seconds,
+    // while batches of six come back in a few seconds each.
+    const chunks = [];
+    for (let i = 0; i < CITIES.length; i += 6) chunks.push(CITIES.slice(i, i + 6));
+    const data = (await Promise.all(chunks.map(fetchForecast))).flat();
     wx = data;
     times = wx[0].time;
     tIndex = {}; times.forEach((t,i) => tIndex[t] = i);
