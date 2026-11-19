@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3f4f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#070b16" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Drive Window">
+<meta name="description" content="Hour-by-hour weather timed to your drive on US-101 between Berkeley and Thousand Oaks.">
+<title>Drive Window · US-101 weather</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230ea5e9'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M7 22c4-1 5-9 9-9s5 6 9 5' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='22' cy='10' r='3' fill='white'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+/* ============ tokens ============ */
+:root{
+  color-scheme:light;
+  --bg:#f3f4f7;
+  --bg-art:radial-gradient(1100px 520px at 0% -10%,#e3e8ff 0%,transparent 60%),radial-gradient(900px 480px at 100% -5%,#dff3ff 0%,transparent 55%);
+  --surface:#ffffff; --surface-2:#f7f8fb; --surface-3:#eef0f5;
+  --ink:#0b1220; --ink-2:#334155; --muted:#64748b; --faint:#98a2b5; --line:#e6e8ef; --line-2:#d9dde6;
+  --accent:#0b1220; --accent-ink:#ffffff; --focus:#3b82f6;
+  --dry:#0e9f6e; --possible:#d97706; --light:#0ea5e9; --moderate:#4f46e5; --heavy:#e11d48; --nodata:#c7cdd8;
+  --temp:#ea580c; --chance:#0ea5e9; --night:#1e2a55; --night-band:rgba(30,42,85,.07); --stop-band:rgba(100,116,139,.12);
+  --shadow-1:0 1px 2px rgba(15,23,42,.05);
+  --shadow-2:0 1px 2px rgba(15,23,42,.04),0 10px 30px -12px rgba(15,23,42,.16);
+  --shadow-3:0 30px 80px -24px rgba(15,23,42,.45);
+  --tiles:none;
+  --r-xl:24px; --r-lg:18px; --r-md:12px; --r-sm:9px;
+  --nav-h:60px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    color-scheme:dark;
+    --bg:#070b16;
+    --bg-art:radial-gradient(1100px 520px at 0% -10%,rgba(79,70,229,.20) 0%,transparent 60%),radial-gradient(900px 480px at 100% -5%,rgba(14,165,233,.12) 0%,transparent 55%);
+    --surface:#0f1626; --surface-2:#131c30; --surface-3:#1a243b;
+    --ink:#e8edf7; --ink-2:#c2cbdd; --muted:#8b97b0; --faint:#5d6984; --line:#1e2942; --line-2:#2a3756;
+    --accent:#e8edf7; --accent-ink:#0b1220; --focus:#60a5fa;
+    --dry:#1fa874; --possible:#c4860c; --light:#2b9fd0; --moderate:#5a5ce8; --heavy:#e8436a; --nodata:#36415c;
+    --temp:#f0773a; --chance:#2b9fd0; --night:#020617; --night-band:rgba(0,0,0,.28); --stop-band:rgba(148,163,184,.10);
+    --shadow-1:none; --shadow-2:0 1px 0 rgba(255,255,255,.03) inset,0 16px 40px -16px rgba(0,0,0,.7); --shadow-3:0 30px 90px -20px rgba(0,0,0,.8);
+    --tiles:brightness(.68) contrast(1.12) saturate(.7);
+  }
+}
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#070b16;
+  --bg-art:radial-gradient(1100px 520px at 0% -10%,rgba(79,70,229,.20) 0%,transparent 60%),radial-gradient(900px 480px at 100% -5%,rgba(14,165,233,.12) 0%,transparent 55%);
+  --surface:#0f1626; --surface-2:#131c30; --surface-3:#1a243b;
+  --ink:#e8edf7; --ink-2:#c2cbdd; --muted:#8b97b0; --faint:#5d6984; --line:#1e2942; --line-2:#2a3756;
+  --accent:#e8edf7; --accent-ink:#0b1220; --focus:#60a5fa;
+  --dry:#1fa874; --possible:#c4860c; --light:#2b9fd0; --moderate:#5a5ce8; --heavy:#e8436a; --nodata:#36415c;
+  --temp:#f0773a; --chance:#2b9fd0; --night:#020617; --night-band:rgba(0,0,0,.28); --stop-band:rgba(148,163,184,.10);
+  --shadow-1:none; --shadow-2:0 1px 0 rgba(255,255,255,.03) inset,0 16px 40px -16px rgba(0,0,0,.7); --shadow-3:0 30px 90px -20px rgba(0,0,0,.8);
+  --tiles:brightness(.68) contrast(1.12) saturate(.7);
+}
+
+/* ============ base ============ */
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:calc(var(--nav-h) + 12px)}
+body{margin:0;min-height:100vh;background:var(--bg-art),var(--bg);background-attachment:fixed;color:var(--ink);
+  font:14.5px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-feature-settings:"cv11","ss01","ss03";-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num,.tnum{font-variant-numeric:tabular-nums}
+svg.ic{width:18px;height:18px;flex:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ============ nav ============ */
+.nav{position:sticky;top:0;z-index:1100;height:var(--nav-h);display:flex;align-items:center;gap:12px;padding:0 max(16px,env(safe-area-inset-left));
+  background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:saturate(1.6) blur(16px);-webkit-backdrop-filter:saturate(1.6) blur(16px);
+  border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;margin-right:auto}
+.brand .logo{width:30px;height:30px;border-radius:9px;flex:none;background:linear-gradient(135deg,#0ea5e9,#4f46e5);display:grid;place-items:center;box-shadow:0 6px 16px -6px rgba(79,70,229,.6)}
+.brand b{font-weight:700;letter-spacing:-.02em;font-size:15.5px;display:block;line-height:1.1}
+.brand small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12.5px;color:var(--muted);white-space:nowrap;box-shadow:var(--shadow-1)}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--nodata);position:relative}
+.pill[data-kind=live] i{background:var(--dry)}
+.pill[data-kind=live] i::after{content:"";position:absolute;inset:-4px;border-radius:50%;background:var(--dry);opacity:.35;animation:ping 2.4s cubic-bezier(0,0,.2,1) infinite}
+.pill[data-kind=loading] i{background:var(--possible);animation:blink .9s ease-in-out infinite alternate}
+.pill[data-kind=error] i{background:var(--heavy)}
+@keyframes ping{75%,100%{transform:scale(2.2);opacity:0}}
+@keyframes blink{to{opacity:.35}}
+.ibtn{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-1);transition:transform .12s,border-color .15s,background .15s}
+.ibtn:hover{border-color:var(--line-2)}
+.ibtn:active{transform:scale(.94)}
+.ibtn svg{width:17px;height:17px}
+.ibtn.spin svg{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============ layout ============ */
+.app{max-width:1440px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.layout{display:flex;flex-direction:column;gap:16px}
+.col{display:contents}
+.o-hero{order:1}.o-trip{order:2}.o-stage{order:3}.o-when{order:4}.o-alerts{order:5}.o-along{order:6}.o-foot{order:7}
+@media (min-width:1080px){
+  .layout{display:grid;grid-template-columns:minmax(400px,460px) minmax(0,1fr);align-items:start;gap:20px}
+  .col{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .col.right{position:sticky;top:calc(var(--nav-h) + 16px)}
+}
+
+/* ============ cards ============ */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-2);padding:18px}
+.ch{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.ch h2{margin:0;font-size:15px;font-weight:650;letter-spacing:-.01em}
+.ch p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);margin:10px 0 0}
+.notice{border-color:color-mix(in srgb,var(--heavy) 35%,var(--line));font-size:13.5px}
+.notice b{color:var(--heavy)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:34px;padding:0 13px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;box-shadow:var(--shadow-1);transition:transform .12s,border-color .15s,background .15s;white-space:nowrap}
+.btn:hover{border-color:var(--line-2)}
+.btn:active{transform:scale(.97)}
+.btn svg{width:15px;height:15px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn[disabled]{opacity:.5;cursor:default}
+.seg{display:flex;background:var(--surface-3);border-radius:11px;padding:3px;gap:2px}
+.seg button{flex:1;border:0;background:transparent;border-radius:9px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted);transition:background .18s,color .18s,box-shadow .18s}
+.seg button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 1px var(--line)}
+
+/* ============ hero ============ */
+.hero{position:relative;overflow:hidden;isolation:isolate;border-radius:var(--r-xl);padding:20px 20px 18px;color:#fff;background:var(--sky);box-shadow:var(--shadow-3);transition:background .6s}
+.hero{--sky:linear-gradient(155deg,#334155,#64748b)}
+.hero[data-sky=clear]{--sky:linear-gradient(155deg,#1d4ed8 0%,#2f80ed 45%,#6cc3ff 100%)}
+.hero[data-sky=possible]{--sky:linear-gradient(155deg,#2b4bb8 0%,#4c6fe0 50%,#9fb5f5 100%)}
+.hero[data-sky=rain]{--sky:linear-gradient(155deg,#1f2a3f 0%,#37475f 50%,#5b6d86 100%)}
+.hero[data-sky=storm]{--sky:linear-gradient(155deg,#0b0f1d 0%,#1f2440 45%,#4a1d6b 100%)}
+.hero[data-sky=night]{--sky:linear-gradient(155deg,#050816 0%,#141a44 55%,#2d2a73 100%)}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(520px 240px at 90% -10%,rgba(255,255,255,.28),transparent 60%),radial-gradient(400px 200px at 0% 110%,rgba(0,0,0,.18),transparent 70%)}
+.hero .art{position:absolute;right:-6px;top:-4px;width:190px;height:138px;z-index:-1;pointer-events:none}
+.hero .route{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;opacity:.9}
+.hero .route svg{width:14px;height:14px;opacity:.9}
+.hero h1{margin:10px 0 4px;font-size:clamp(22px,4.6vw,28px);line-height:1.12;letter-spacing:-.025em;font-weight:750;max-width:15ch;text-wrap:balance}
+.hero .lede{margin:0;font-size:13.5px;line-height:1.45;opacity:.88;max-width:52ch}
+.hk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:16px}
+.hk div{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:9px 11px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);min-width:0}
+.hk span{display:block;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;opacity:.75}
+.hk b{display:block;font-size:17px;font-weight:700;letter-spacing:-.01em;margin-top:1px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hk small{display:block;font-size:11.5px;opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.htags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.htag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.14);color:#fff}
+.htag.warn{background:rgba(255,80,110,.24);border-color:rgba(255,120,140,.35)}
+button.htag{cursor:pointer}
+.htag svg{width:13px;height:13px}
+.skel{border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.12),rgba(255,255,255,.26),rgba(255,255,255,.12));background-size:200% 100%;animation:shimmer 1.4s linear infinite}
+.skel.dark{background:linear-gradient(90deg,var(--surface-3),var(--surface-2),var(--surface-3));background-size:200% 100%}
+@keyframes shimmer{to{background-position:-200% 0}}
+/* hero art */
+.art .rays{transform-origin:138px 46px;animation:spin 40s linear infinite}
+.art .drift{animation:drift 14s ease-in-out infinite alternate}
+.art .drift.slow{animation-duration:22s}
+@keyframes drift{from{transform:translateX(-6px)}to{transform:translateX(10px)}}
+.art .drop{animation:fall 1.1s linear infinite;opacity:0}
+@keyframes fall{0%{transform:translateY(-6px);opacity:0}20%{opacity:.85}100%{transform:translateY(22px);opacity:0}}
+.art .bolt{animation:flash 5s ease-in-out infinite}
+@keyframes flash{0%,86%,100%{opacity:0}88%,92%{opacity:1}90%{opacity:.3}}
+.art .star{animation:twinkle 3s ease-in-out infinite alternate}
+@keyframes twinkle{from{opacity:.25}to{opacity:.9}}
+
+/* ============ trip controls ============ */
+.dir{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:8px}
+.dir .end{min-width:0;padding:4px 6px}
+.dir .end span{display:block;font-size:11px;color:var(--muted);font-weight:500}
+.dir .end b{display:block;font-size:14.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dir .end.to{text-align:right}
+.swap{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;box-shadow:var(--shadow-1);transition:transform .35s cubic-bezier(.3,1.4,.5,1)}
+.swap.flip{transform:rotate(180deg)}
+.swap svg{width:17px;height:17px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.f{min-width:0}
+.f.full{grid-column:1/-1}
+.f label,.f .lab{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:500;color:var(--muted);margin:0 0 6px}
+.f output{font-size:13px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums}
+.f input[type=date],.f input[type=time],.f input[type=number],.f select{width:100%;height:42px;padding:0 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2);font-size:15px;appearance:none;-webkit-appearance:none;transition:border-color .15s,background .15s}
+.f input:hover,.f select:hover{border-color:var(--line-2)}
+.f input:focus,.f select:focus{outline:none;border-color:var(--focus);background:var(--surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 18%,transparent)}
+.f select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%238b95a8' stroke-width='1.7'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:32px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(to right,var(--ink) var(--p,50%),var(--surface-3) var(--p,50%))}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--surface-3)}
+input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--ink)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-8px;border-radius:50%;background:var(--surface);border:1px solid var(--line-2);box-shadow:0 2px 6px rgba(0,0,0,.18)}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--surface);border:1px solid var(--line-2);box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.ticks{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);margin-top:-2px;padding:0 4px;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);font-size:13px;font-weight:550;color:var(--ink-2);transition:all .15s}
+.chip:hover{border-color:var(--line-2)}
+.chip[aria-checked=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#customBrk[hidden]{display:none}
+
+/* ============ stage: map + ribbon ============ */
+.stage{padding:0;overflow:hidden}
+.mapwrap{position:relative}
+#map{height:clamp(320px,46vh,560px);background:var(--surface-3);z-index:0}
+@media (min-width:1080px){#map{height:max(340px,calc(100vh - var(--nav-h) - 360px))}}
+.leaflet-tile-pane{filter:var(--tiles)}
+.leaflet-container{font:inherit;background:var(--surface-3)}
+.leaflet-control-attribution{font-size:10.5px!important;background:color-mix(in srgb,var(--surface) 82%,transparent)!important;color:var(--muted)!important;border-top-left-radius:8px}
+.leaflet-control-attribution a{color:var(--muted)!important}
+.leaflet-bar{border:1px solid var(--line)!important;border-radius:11px!important;overflow:hidden;box-shadow:var(--shadow-2)!important}
+.leaflet-bar a{background:var(--surface)!important;color:var(--ink)!important;border-bottom-color:var(--line)!important;width:34px!important;height:34px!important;line-height:34px!important}
+.leaflet-tooltip.tt{background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow-2);font-size:11px;font-weight:650;padding:2px 7px;border-radius:7px;font-variant-numeric:tabular-nums}
+.leaflet-tooltip.tt::before{display:none}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-3)}
+.leaflet-popup-content-wrapper{border-radius:14px}
+.leaflet-popup-content{margin:12px 14px;font-size:13px;line-height:1.5;min-width:190px}
+.leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+.pp b{font-size:14px;display:block}
+.pp .m{color:var(--muted);font-size:12px}
+.pp .btn{margin-top:10px;width:100%}
+.mapfloat{position:absolute;z-index:500;display:flex;gap:6px}
+.mapfloat.tr{top:12px;right:12px}
+.mapfloat.bl{left:12px;bottom:12px;flex-wrap:wrap;max-width:calc(100% - 24px)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 10px;border-radius:10px;background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:11.5px;color:var(--ink-2);box-shadow:var(--shadow-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:4px;border-radius:2px}
+.car{position:relative}
+.car .halo{position:absolute;inset:-9px;border-radius:50%;background:var(--ink);opacity:.18;animation:ping 2s cubic-bezier(0,0,.2,1) infinite}
+.car .core{position:absolute;inset:0;border-radius:50%;background:var(--ink);border:3px solid var(--surface);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+/* ribbon */
+.ribbon-wrap{border-top:1px solid var(--line);padding:14px 16px 12px}
+.rhead{display:flex;align-items:center;gap:10px;min-height:44px}
+.readout{flex:1;min-width:0}
+.readout .t{font-size:15px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.readout .t em{font-style:normal;color:var(--muted);font-weight:500}
+.readout .w{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.readout .w .sw{width:8px;height:8px;border-radius:50%;flex:none}
+.ribbon{position:relative;margin-top:8px;touch-action:pan-y;cursor:crosshair;user-select:none;-webkit-user-select:none;outline:none;border-radius:10px}
+.ribbon:focus-visible{box-shadow:0 0 0 2px var(--focus)}
+.ribbon svg{display:block;width:100%;overflow:visible}
+.ribbon .lbl{font-size:10.5px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.ribbon .lbl.strong{fill:var(--ink-2);font-weight:600}
+.ribbon .trk{font-size:9.5px;fill:var(--faint);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.ribbon .grid{stroke:var(--line);stroke-width:1}
+.ribbon .base{stroke:var(--line-2);stroke-width:1}
+.ribbon .night{fill:var(--night-band)}
+.ribbon .stopb{fill:url(#hatch)}
+.ribbon .temp{fill:none;stroke:var(--temp);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.ribbon .rain{fill:url(#rainFill);stroke:var(--moderate);stroke-width:1.5;stroke-linejoin:round}
+.ribbon .cur line{stroke:var(--ink);stroke-width:1.25}
+.ribbon .cur circle{stroke:var(--surface);stroke-width:2}
+.ribbon .draw{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw 1.1s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.playbtn svg{width:14px;height:14px}
+
+/* ============ when to leave ============ */
+.best{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--dry) 12%,var(--surface)),var(--surface-2));border:1px solid color-mix(in srgb,var(--dry) 25%,var(--line));margin-bottom:14px}
+.best .bi{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--dry) 18%,transparent);color:var(--dry);flex:none}
+.best .bi svg{width:19px;height:19px}
+.best .bt{flex:1;min-width:0}
+.best .bt span{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.best .bt b{display:block;font-size:14.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.best .bt small{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mx{display:grid;grid-template-columns:44px repeat(var(--cols),minmax(0,1fr));gap:3px;align-items:center}
+.mx .hl{font-size:10.5px;color:var(--faint);text-align:center;font-variant-numeric:tabular-nums;padding-bottom:2px}
+.mx .dl{font-size:11.5px;color:var(--ink-2);line-height:1.1;white-space:nowrap}
+.mx .dl b{font-weight:650}
+.mx .dl small{color:var(--faint);font-size:10.5px;margin-left:2px}
+.mx .dl.today b{color:var(--ink)}
+.cell{height:24px;border-radius:5px;border:0;padding:0;position:relative;transition:transform .12s,box-shadow .12s}
+.cell:hover{transform:scale(1.12);z-index:2;box-shadow:0 4px 10px rgba(0,0,0,.18)}
+.cell.best::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--surface);box-shadow:0 0 0 1.5px var(--ink)}
+.cell[aria-pressed=true]{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink);z-index:3}
+.cell.na{background:repeating-linear-gradient(135deg,var(--surface-3) 0 3px,var(--surface-2) 3px 6px)!important;cursor:default}
+.cell.na:hover{transform:none;box-shadow:none}
+.mxlegend{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:11.5px;color:var(--muted)}
+.mxlegend span{display:inline-flex;align-items:center;gap:6px}
+.mxlegend i{width:12px;height:12px;border-radius:3px}
+.mxsel{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2);display:flex;align-items:center;gap:8px;min-height:20px}
+.mxsel b{color:var(--ink)}
+.tip{position:fixed;z-index:3000;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12px;line-height:1.4;padding:7px 10px;border-radius:9px;box-shadow:var(--shadow-3);opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;max-width:240px}
+.tip.on{opacity:1;transform:none}
+.tip b{display:block;font-size:12.5px}
+
+/* ============ alerts ============ */
+.alert{border-top:1px solid var(--line)}
+.alert:first-of-type{border-top:0}
+.alert summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:10px 0}
+.alert summary::-webkit-details-marker{display:none}
+.alert .ai{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:color-mix(in srgb,var(--heavy) 14%,transparent);color:var(--heavy)}
+.alert .ai.mod{background:color-mix(in srgb,var(--possible) 16%,transparent);color:var(--possible)}
+.alert .ai svg{width:15px;height:15px}
+.alert summary b{font-weight:600;font-size:13.5px}
+.alert summary em{font-style:normal;color:var(--muted);font-size:13px}
+.alert summary small{color:var(--muted);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.alert p{margin:0 0 12px 38px;font-size:12.5px;color:var(--muted)}
+
+/* ============ along the way ============ */
+.tline{list-style:none;margin:0;padding:0;position:relative}
+.tline::before{content:"";position:absolute;left:73px;top:14px;bottom:14px;width:2px;border-radius:1px;background:var(--line)}
+.tline li{display:grid;grid-template-columns:60px 28px 1fr;align-items:center;column-gap:0}
+.tline .tm{font-size:12.5px;font-weight:600;color:var(--ink-2);text-align:right;padding-right:10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tline .nd{width:28px;display:grid;place-items:center;position:relative;z-index:1}
+.tline .nd i{width:12px;height:12px;border-radius:50%;background:var(--c,var(--nodata));box-shadow:0 0 0 3px var(--surface)}
+.tline li.major .nd i{width:16px;height:16px}
+.tline .bd{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;margin:3px 0 3px 8px;padding:9px 12px;border-radius:12px;cursor:pointer;transition:background .15s;min-width:0}
+.tline .bd:hover{background:var(--surface-2)}
+.tline .bd:focus-visible{outline:2px solid var(--focus)}
+.tline .bd .tx{flex:1;min-width:0}
+.tline .bd .n{font-weight:600;font-size:14px}
+.tline .bd .s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tline .bd .note{font-size:12px;color:var(--faint);margin-top:2px}
+.tline .bd .w{display:flex;align-items:center;gap:6px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+.tline .bd .w svg{color:var(--muted)}
+.tline li.evt .nd i{width:22px;height:22px;background:var(--surface-3);display:grid;place-items:center;box-shadow:0 0 0 3px var(--surface);color:var(--muted)}
+.tline li.evt .nd svg{width:12px;height:12px}
+.tline li.evt .ev{margin:2px 0 2px 8px;padding:6px 12px;font-size:12.5px;color:var(--muted);border:1px dashed var(--line-2);border-radius:10px}
+.tline li.evt .ev b{color:var(--ink-2);font-weight:600}
+.calc{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;margin-bottom:14px;font-variant-numeric:tabular-nums}
+.calc span:nth-child(odd){color:var(--muted)}
+.calc span:nth-child(even){text-align:right}
+.calc .tot{border-top:1px solid var(--line);padding-top:7px;margin-top:3px;font-weight:650;color:var(--ink)!important}
+.tablewrap{overflow-x:auto;margin:0 -18px;padding:0 18px;-webkit-overflow-scrolling:touch}
+table.data{border-collapse:separate;border-spacing:0;width:100%;min-width:720px;font-size:12.5px;font-variant-numeric:tabular-nums}
+table.data th{position:sticky;top:0;background:var(--surface);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:right;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.data td{padding:8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+table.data th:first-child,table.data td:first-child{text-align:left;position:sticky;left:0;background:var(--surface);padding-left:0;z-index:1}
+table.data td:first-child{font-weight:600}
+table.data .l{text-align:left}
+table.data tbody tr{cursor:pointer}
+table.data tbody tr:hover td{background:var(--surface-2)}
+.sw{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px}
+.dim{color:var(--faint)}
+.foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-top:14px}
+
+/* ============ sheet ============ */
+.sheet{position:fixed;inset:0;z-index:2000;display:flex;align-items:flex-end;justify-content:center;background:rgba(5,8,18,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .2s}
+.sheet.open{opacity:1;pointer-events:auto}
+.panel{background:var(--surface);width:100%;max-width:680px;max-height:90vh;overflow:auto;border-radius:24px 24px 0 0;padding:10px 18px calc(22px + env(safe-area-inset-bottom));transform:translateY(24px);transition:transform .28s cubic-bezier(.2,.9,.3,1);box-shadow:var(--shadow-3)}
+.sheet.open .panel{transform:none}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--line-2);margin:0 auto 10px}
+@media (min-width:720px){.sheet{align-items:center}.panel{border-radius:24px;max-height:86vh;padding-top:18px}.grab{display:none}}
+.panel header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.panel h3{margin:0;font-size:21px;letter-spacing:-.02em}
+.panel header p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.now{display:flex;align-items:center;gap:14px;margin:14px 0;padding:14px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line)}
+.now svg.big{width:40px;height:40px;color:var(--ink-2)}
+.now .tv{font-size:30px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.now .cv{font-size:13px;color:var(--muted)}
+.now .cv b{display:block;color:var(--ink);font-size:14px;font-weight:600}
+.mini{margin:6px 0 4px}
+.mini svg{display:block;width:100%}
+.mini .lbl{font-size:10.5px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.hrs{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:6px}
+.hrs th{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:right;padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.hrs td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.hrs th:first-child,.hrs td:first-child,.hrs .l{text-align:left}
+.hrs td .ic{width:16px;height:16px;vertical-align:-3px;color:var(--muted);margin-right:5px}
+.hrs tr.you td{background:color-mix(in srgb,var(--ink) 6%,transparent);font-weight:650}
+.hrs tr.you td:first-child{box-shadow:inset 3px 0 0 var(--ink)}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+@media (max-width:560px){.hrs .skyt{display:none}.hrs td,.hrs th{padding-left:4px;padding-right:4px}}
+
+/* ============ toast, footer ============ */
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));z-index:3000;transform:translate(-50%,16px);opacity:0;background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:12px;font-size:13px;font-weight:550;box-shadow:var(--shadow-3);transition:opacity .2s,transform .25s cubic-bezier(.2,.9,.3,1);pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+footer.src{font-size:12px;color:var(--muted);line-height:1.6;padding:4px 4px 0}
+footer.src a{color:inherit}
+
+@media (max-width:560px){
+  .hk{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero .art{width:132px;height:96px;right:-18px;top:-14px;opacity:.55}
+  .hero .route{padding-right:56px}
+  .dir .end{padding:4px 2px}
+  .dir .end b{font-size:14px}
+  .card{padding:16px}
+  .tablewrap{margin:0 -16px;padding:0 16px}
+  .brand small{display:none}
+  .mapfloat.bl{position:static;max-width:none}
+  .mapfloat.bl .legend{border-radius:0;border:0;border-top:1px solid var(--line);box-shadow:none;width:100%;justify-content:center;padding:8px 12px;backdrop-filter:none;background:var(--surface)}
+  .pill .lab{display:none}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+    <symbol id="i-partly" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v1.3M3.2 8H4.5M4.6 4.6l.9.9M11.4 4.6l-.9.9"/><path d="M5.6 10.4A3 3 0 0 1 10.5 7"/><path d="M8.5 19h9a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6 1.2A3 3 0 0 0 8.5 19z"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 18.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.4 11.6 3.5 3.5 0 0 0 7 18.5z"/></symbol>
+    <symbol id="i-fog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 9h16M6 13h12M4 17h16"/></symbol>
+    <symbol id="i-rain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.4 7.6 3.5 3.5 0 0 0 7 14.5z"/><path d="M8.5 17.5l-1 2.5M12.5 17.5l-1 2.5M16.5 17.5l-1 2.5"/></symbol>
+    <symbol id="i-storm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.4 7.6 3.5 3.5 0 0 0 7 14.5z"/><path d="M12.5 15l-2 3.5h3l-2 3.5"/></symbol>
+    <symbol id="i-snow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.4 7.6 3.5 3.5 0 0 0 7 14.5z"/><path d="M8.5 18h.01M12 19.5h.01M15.5 18h.01"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></symbol>
+    <symbol id="i-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h12l-3-3M17 17H5l3 3"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4.5" height="16" rx="1.2"/><rect x="13.5" y="4" width="4.5" height="16" rx="1.2"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 9h1.5a2.5 2.5 0 0 1 0 5H16"/></symbol>
+    <symbol id="i-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 0 0 4 0V3M9 13v8M17 3c-2 0-3 2-3 5s1 4 3 4v9"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  </defs>
+</svg>
+
+<nav class="nav" aria-label="App">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 32 32"><path d="M5 23c4-1 5-11 11-11s6 7 11 6" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round"/><circle cx="23" cy="9" r="3.4" fill="#fff"/></svg></div>
+    <div style="min-width:0"><b>Drive Window</b><small>US-101 · Berkeley ⇄ Thousand Oaks</small></div>
+  </div>
+  <span class="pill" id="status" data-kind="loading" role="status"><i></i><span class="lab">Loading</span></span>
+  <button class="ibtn" id="share" aria-label="Share this trip"><svg><use href="#i-share"/></svg></button>
+  <button class="ibtn" id="theme" aria-label="Theme"><svg><use href="#i-theme"/></svg></button>
+  <button class="ibtn" id="refresh" aria-label="Refresh forecast"><svg><use href="#i-refresh"/></svg></button>
+</nav>
+
+<div class="app">
+  <div class="card notice" id="notice" hidden style="margin-bottom:16px"></div>
+  <div class="layout">
+    <div class="col left">
+      <section class="hero o-hero" id="hero" data-sky="none" aria-live="polite"></section>
+
+      <section class="card o-trip" aria-labelledby="tripH">
+        <div class="ch"><div><h2 id="tripH">Your trip</h2><p id="tripSub">Set when you leave and how you drive.</p></div></div>
+        <div class="dir" id="dir">
+          <div class="end"><span>From</span><b id="fromName">Berkeley</b></div>
+          <button class="swap" id="swap" aria-label="Reverse direction"><svg><use href="#i-swap"/></svg></button>
+          <div class="end to"><span>To</span><b id="toName">Thousand Oaks</b></div>
+        </div>
+        <div class="fields">
+          <div class="f"><label for="date">Departure date</label><input type="date" id="date"></div>
+          <div class="f"><label for="time">Departure time</label><input type="time" id="time" step="900"></div>
+          <div class="f full">
+            <div class="lab"><label for="speed" style="margin:0">Average speed</label><output id="speedOut" for="speed">55 mph</output></div>
+            <input type="range" id="speed" min="40" max="70" step="5">
+            <div class="ticks"><span>40</span><span>50</span><span>60</span><span>70</span></div>
+          </div>
+          <div class="f full"><label for="breaks">Rest breaks</label>
+            <select id="breaks">
+              <option value="0-0">No rest breaks</option>
+              <option value="60-10">10 min every hour</option>
+              <option value="60-15">15 min every hour</option>
+              <option value="90-10">10 min every 90 min</option>
+              <option value="90-15">15 min every 90 min</option>
+              <option value="90-30">30 min every 90 min</option>
+              <option value="120-15">15 min every 2 hr</option>
+              <option value="120-20">20 min every 2 hr</option>
+              <option value="120-30">30 min every 2 hr</option>
+              <option value="150-20">20 min every 2½ hr</option>
+              <option value="180-15">15 min every 3 hr</option>
+              <option value="180-30">30 min every 3 hr</option>
+              <option value="240-30">30 min every 4 hr</option>
+              <option value="custom">Custom…</option>
+            </select></div>
+        </div>
+        <div class="fields" id="customBrk" hidden>
+          <div class="f"><label for="brkEvery">Stop after (min driving)</label><input type="number" id="brkEvery" min="15" max="480" step="5" inputmode="numeric"></div>
+          <div class="f"><label for="brkLen">Break length (min)</label><input type="number" id="brkLen" min="0" max="180" step="5" inputmode="numeric"></div>
+        </div>
+        <div class="f full" style="margin-top:14px">
+          <div class="lab" id="mealLab">Meal stop in San Luis Obispo</div>
+          <div class="chips" id="meal" role="radiogroup" aria-labelledby="mealLab">
+            <button class="chip" role="radio" data-v="0">None</button>
+            <button class="chip" role="radio" data-v="20">20 min</button>
+            <button class="chip" role="radio" data-v="30">30 min</button>
+            <button class="chip" role="radio" data-v="45">45 min</button>
+            <button class="chip" role="radio" data-v="60">1 hr</button>
+            <button class="chip" role="radio" data-v="90">1½ hr</button>
+            <button class="chip" role="radio" data-v="120">2 hr</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card o-when" aria-labelledby="whenH">
+        <div class="ch"><div><h2 id="whenH">When to leave</h2><p>Every departure Nov 23–29, colored by the rain you’d drive through.</p></div></div>
+        <div id="best"></div>
+        <div id="matrix"></div>
+        <div class="mxlegend" id="mxlegend"></div>
+        <div class="mxsel" id="mxsel"></div>
+      </section>
+
+      <section class="card o-alerts" id="alerts" hidden aria-labelledby="alertsH"></section>
+
+      <section class="card o-along" aria-labelledby="alongH">
+        <div class="ch">
+          <div><h2 id="alongH">Along the way</h2><p id="alongSub">Every town, timed to when you pass it.</p></div>
+          <div class="seg" id="viewSeg" role="group" aria-label="View">
+            <button data-view="stops">Stops</button>
+            <button data-view="data">Data</button>
+          </div>
+        </div>
+        <div id="stopsView"></div>
+        <div id="dataView" hidden></div>
+      </section>
+
+      <footer class="src o-foot">
+        Forecasts from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (best-match model blend, hourly) · alerts from the <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service</a> · map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, route by OSRM. Mileage and times are estimates; forecasts more than five days out are rough guides.
+      </footer>
+    </div>
+
+    <div class="col right">
+      <section class="card stage o-stage" aria-label="Route map and drive timeline">
+        <div class="mapwrap">
+          <div id="map" aria-label="Route map"></div>
+          <div class="mapfloat tr"><button class="ibtn" id="fit" aria-label="Fit route"><svg><use href="#i-fit"/></svg></button></div>
+          <div class="mapfloat bl"><div class="legend" id="legend"></div></div>
+        </div>
+        <div class="ribbon-wrap">
+          <div class="rhead">
+            <div class="readout" id="readout"></div>
+            <button class="btn playbtn" id="play" aria-label="Play the drive"><svg><use href="#i-play"/></svg><span>Play</span></button>
+          </div>
+          <div class="ribbon" id="ribbon" tabindex="0" role="slider" aria-label="Position along the drive" aria-valuemin="0"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet" aria-hidden="true">
+  <div class="panel" id="sheetPanel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1"></div>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+/* ===================== configuration ===================== */
+const TZ = "America/Los_Angeles", HOUR = 3600000, MIN = 60000;
+const CITIES = [
+  {id:"start",      name:"Berkeley",        lat:37.8712, lon:-122.2741, mi:0,   major:true},
+  {id:"oakland",    name:"Oakland",         lat:37.8044, lon:-122.2712, mi:5},
+  {id:"hayward",    name:"Hayward",         lat:37.6688, lon:-122.0808, mi:22},
+  {id:"fremont",    name:"Fremont",         lat:37.5485, lon:-121.9886, mi:33},
+  {id:"sanjose",    name:"San Jose",        lat:37.3382, lon:-121.8863, mi:45,  major:true},
+  {id:"morganhill", name:"Morgan Hill",     lat:37.1305, lon:-121.6544, mi:65},
+  {id:"gilroy",     name:"Gilroy",          lat:37.0058, lon:-121.5683, mi:76},
+  {id:"salinas",    name:"Salinas",         lat:36.6777, lon:-121.6555, mi:106, major:true},
+  {id:"soledad",    name:"Soledad",         lat:36.4247, lon:-121.3263, mi:131},
+  {id:"kingcity",   name:"King City",       lat:36.2127, lon:-121.1260, mi:153, major:true},
+  {id:"paso",       name:"Paso Robles",     lat:35.6266, lon:-120.6910, mi:204, major:true},
+  {id:"atascadero", name:"Atascadero",      lat:35.4894, lon:-120.6707, mi:214, note:"Cuesta Grade lies between here and San Luis Obispo: a short, steep climb that can be slick in rain."},
+  {id:"slo",        name:"San Luis Obispo", lat:35.2828, lon:-120.6596, mi:232, major:true, note:"Roughly the halfway point, and where the meal stop is planned."},
+  {id:"pismo",      name:"Pismo Beach",     lat:35.1428, lon:-120.6413, mi:243},
+  {id:"santamaria", name:"Santa Maria",     lat:34.9530, lon:-120.4357, mi:262},
+  {id:"buellton",   name:"Buellton",        lat:34.6136, lon:-120.1927, mi:288},
+  {id:"gaviota",    name:"Gaviota",         lat:34.4719, lon:-120.2281, mi:300, note:"Gaviota Pass and the coast can be gusty; watch the gust numbers here."},
+  {id:"goleta",     name:"Goleta",          lat:34.4358, lon:-119.8276, mi:325},
+  {id:"sb",         name:"Santa Barbara",   lat:34.4208, lon:-119.6982, mi:333, major:true},
+  {id:"carp",       name:"Carpinteria",     lat:34.3989, lon:-119.5185, mi:344},
+  {id:"ventura",    name:"Ventura",         lat:34.2746, lon:-119.2290, mi:361, major:true},
+  {id:"camarillo",  name:"Camarillo",       lat:34.2164, lon:-119.0376, mi:376, note:"The Conejo Grade sits between here and Thousand Oaks."},
+  {id:"end",        name:"Thousand Oaks",   lat:34.1706, lon:-118.8376, mi:391, major:true}
+];
+const TOTAL_MI = CITIES[CITIES.length - 1].mi;
+const MEAL_AT = CITIES.find(c => c.id === "slo");
+const ALERT_POINTS = ["start","sanjose","salinas","paso","slo","sb","ventura","end"].map(id => CITIES.find(c => c.id === id));
+const ROUTE_VIA = ["start","sanjose","salinas","slo","sb","end"].map(id => CITIES.find(c => c.id === id));
+const PLAN_HOURS = [5,6,7,8,9,10,11,12,13,14,15];
+const TRIP_FIRST = "2026-11-23", TRIP_LAST = "2026-11-29";   // allowed departure dates
+const FETCH_BATCH = 6;
+const HOURLY_VARS = "temperature_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m,visibility";
+const STEP = 5;   // minutes between drive-timeline samples
+
+const WMO = {0:["Clear","sun"],1:["Mostly clear","sun"],2:["Partly cloudy","partly"],3:["Overcast","cloud"],45:["Fog","fog"],48:["Freezing fog","fog"],
+  51:["Light drizzle","rain"],53:["Drizzle","rain"],55:["Heavy drizzle","rain"],56:["Freezing drizzle","rain"],57:["Freezing drizzle","rain"],
+  61:["Light rain","rain"],63:["Rain","rain"],65:["Heavy rain","rain"],66:["Freezing rain","rain"],67:["Freezing rain","rain"],
+  71:["Light snow","snow"],73:["Snow","snow"],75:["Heavy snow","snow"],77:["Snow grains","snow"],
+  80:["Light showers","rain"],81:["Showers","rain"],82:["Violent showers","storm"],85:["Snow showers","snow"],86:["Snow showers","snow"],
+  95:["Thunderstorm","storm"],96:["Thunderstorm, hail","storm"],99:["Thunderstorm, hail","storm"]};
+
+/* Rain categories (in/hr). Colors were checked for colorblind separation in light and dark. */
+const CATS = ["nodata","dry","possible","light","moderate","heavy"];
+const CAT = {
+  nodata:  {label:"No forecast",   short:"–",        v:"--nodata"},
+  dry:     {label:"Dry",           short:"Dry",      v:"--dry"},
+  possible:{label:"Rain possible", short:"Possible", v:"--possible"},
+  light:   {label:"Light rain",    short:"Light",    v:"--light"},
+  moderate:{label:"Moderate rain", short:"Moderate", v:"--moderate"},
+  heavy:   {label:"Heavy rain",    short:"Heavy",    v:"--heavy"}
+};
+const WET = new Set(["light","moderate","heavy"]);
+function category(p, prob){
+  if (p == null) return "nodata";
+  if (p >= 0.30) return "heavy";
+  if (p >= 0.10) return "moderate";
+  if (p >= 0.005) return "light";
+  return prob != null && prob >= 40 ? "possible" : "dry";
+}
+const worse = (a, b) => CATS.indexOf(a) >= CATS.indexOf(b) ? a : b;
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ===================== state ===================== */
+const $ = id => document.getElementById(id);
+const BREAK_VALUES = [...$("breaks").options].map(o => o.value);
+const MEAL_VALUES = ["0","20","30","45","60","90","120"];
+const SPEED_VALUES = ["40","45","50","55","60","65","70"];
+const defaults = {dir:"south", date:null, time:"08:00", speed:"55", breaks:"90-15", brkEvery:"90", brkLen:"15", meal:"0", view:"stops", theme:"auto"};
+let state = {...defaults};
+try { Object.assign(state, JSON.parse(localStorage.getItem("route101pro") || localStorage.getItem("route101") || "{}")); } catch (e) {}
+const URL_KEYS = {dir:"dir", date:"date", time:"t", speed:"mph", breaks:"brk", brkEvery:"every", brkLen:"len", meal:"meal"};
+const qs = new URLSearchParams(location.search);
+for (const [k, q] of Object.entries(URL_KEYS)) if (qs.has(q)) state[k] = qs.get(q);
+if (!["south","north"].includes(state.dir)) state.dir = defaults.dir;
+if (!SPEED_VALUES.includes(String(state.speed))) state.speed = defaults.speed;
+if (!BREAK_VALUES.includes(state.breaks)) state.breaks = defaults.breaks;
+if (!MEAL_VALUES.includes(String(state.meal))) state.meal = defaults.meal;
+if (!["stops","data"].includes(state.view)) state.view = defaults.view;
+if (!["auto","light","dark"].includes(state.theme)) state.theme = "auto";
+if (!/^\d\d:\d\d$/.test(state.time)) state.time = defaults.time;
+if (!/^\d{4}-\d\d-\d\d$/.test(state.date || "") || state.date < todayLocal()) state.date = todayLocal();
+if (toMs(state.date, state.time) < nowLocal() - 30 * MIN) state.date = new Date(toMs(todayLocal(), "12:00") + 24 * HOUR).toISOString().slice(0, 10);   // roll a passed departure to tomorrow
+state.date = clampTripDate(state.date);
+function clampTripDate(d, lo = TRIP_FIRST, hi = TRIP_LAST){ return d < lo ? lo : d > hi ? hi : d; }
+$("date").min = TRIP_FIRST; $("date").max = TRIP_LAST;
+function save(){ try { localStorage.setItem("route101pro", JSON.stringify(state)); } catch (e) {} }
+function syncURL(){
+  const p = new URLSearchParams();
+  for (const [k, q] of Object.entries(URL_KEYS)) {
+    if ((k === "brkEvery" || k === "brkLen") && state.breaks !== "custom") continue;
+    p.set(q, state[k]);
+  }
+  history.replaceState(null, "", location.pathname + "?" + p.toString());
+}
+
+let wx = null, sun = [], times = [], tIndex = Object.create(null), fetchedAt = null, wxFailed = false;
+let alerts = [], alertsFailed = false;
+
+/* ===================== time helpers =====================
+   Trip times are "naive local" ms: Pacific wall-clock stored as UTC. Open-Meteo returns Pacific keys. */
+function nowLocal(){
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"})
+    .formatToParts(new Date()).map(x => [x.type, x.value]));
+  return Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute);
+}
+function todayLocal(){ return new Date(nowLocal()).toISOString().slice(0, 10); }
+function toMs(date, time){ const [y,m,d] = date.split("-").map(Number), [hh,mm] = time.split(":").map(Number); return Date.UTC(y, m - 1, d, hh, mm); }
+const naive = s => toMs(s.slice(0, 10), s.slice(11, 16));
+const hhmm = h => String(h).padStart(2, "0") + ":00";
+const keyFor = ms => new Date(ms).toISOString().slice(0, 13) + ":00";
+const dateOf = ms => new Date(ms).toISOString().slice(0, 10);
+function fmtTime(ms){ const d = new Date(ms); let h = d.getUTCHours(); const m = d.getUTCMinutes(); const ap = h < 12 ? "am" : "pm"; h = h % 12 || 12; return h + ":" + String(m).padStart(2,"0") + " " + ap; }
+function fmtHour(ms, compact){ let h = new Date(ms).getUTCHours(); const ap = h < 12 ? (compact ? "a" : " am") : (compact ? "p" : " pm"); h = h % 12 || 12; return h + ap; }
+const fmtDay = ms => new Date(ms).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"});
+const fmtWd = ms => new Date(ms).toLocaleDateString("en-US",{weekday:"short",timeZone:"UTC"});
+function fmtDur(min){ const t = Math.round(min), h = Math.floor(t / 60), m = t % 60; return h ? h + " hr" + (m ? " " + m + " min" : "") : m + " min"; }
+function fmtDurShort(min){ const t = Math.round(min), h = Math.floor(t / 60), m = t % 60; return h ? h + "h" + (m ? " " + String(m).padStart(2,"0") + "m" : "") : m + "m"; }
+const fmtNum = (v, d) => v == null || Number.isNaN(+v) ? "–" : (+v).toFixed(d);
+const fmtInt = v => v == null || Number.isNaN(+v) ? "–" : String(Math.round(v));
+const fmtClock = d => d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const iconId = code => (WMO[code] || [])[1] || "cloud";
+const icon = (code, cls = "ic") => '<svg class="' + cls + '" aria-hidden="true"><use href="#i-' + iconId(code) + '"/></svg>';
+const sky = code => (WMO[code] || ["–"])[0];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ===================== trip model ===================== */
+function breakPlan(){
+  if (state.breaks === "custom") {
+    if (!(Number(state.brkEvery) > 0)) return [0, 0];
+    return [clamp(Number(state.brkEvery), 15, 480), clamp(Number(state.brkLen) || 0, 0, 180)];
+  }
+  return state.breaks.split("-").map(Number);
+}
+const milesFor = c => state.dir === "south" ? c.mi : TOTAL_MI - c.mi;
+const ordered = () => state.dir === "south" ? CITIES : [...CITIES].reverse();
+const southMile = miles => state.dir === "south" ? miles : TOTAL_MI - miles;
+
+/* Stops along the way, as events on the driving clock. A rest break happens after every `every` minutes
+   of driving (never at arrival); the meal happens on reaching San Luis Obispo. */
+function makePlan(){
+  const speed = Number(state.speed), [every, len] = breakPlan(), meal = Number(state.meal) || 0;
+  const totalDrive = TOTAL_MI / speed * 60, events = [];
+  if (every > 0 && len > 0) for (let k = 1; k * every < totalDrive - 1e-9; k++) events.push({drive:k * every, dur:len, kind:"rest"});
+  if (meal) events.push({drive:milesFor(MEAL_AT) / speed * 60, dur:meal, kind:"meal"});
+  events.sort((a, b) => a.drive - b.drive);
+  let acc = 0;
+  for (const e of events) { e.start = e.drive + acc; acc += e.dur; e.sm = southMile(e.drive * speed / 60); }
+  return {speed, every, len, meal, totalDrive, events};
+}
+let P = makePlan();
+const stoppedBefore = drive => P.events.reduce((a, e) => e.drive < drive - 1e-9 ? a + e.dur : a, 0);
+const elapsedAt = drive => drive + stoppedBefore(drive);
+function posAt(t){
+  let el = 0, d = 0;
+  for (const e of P.events) {
+    const seg = e.drive - d;
+    if (t < el + seg) return {drive:d + (t - el), stop:null};
+    el += seg; d = e.drive;
+    if (t < el + e.dur) return {drive:d, stop:e};
+    el += e.dur;
+  }
+  return {drive:Math.min(P.totalDrive, d + (t - el)), stop:null};
+}
+
+/* Forecast for a town at a moment. Precipitation, probability, weather code and gusts describe the hour
+   ending at each timestamp, so passing at 8:40 uses the 9:00 value (8–9 am). Temperature, wind and
+   visibility are instantaneous and use the nearest hour. */
+function sample(ci, eta){
+  const h = wx && wx[ci]; if (!h) return null;
+  const binStart = Math.floor(eta / HOUR) * HOUR;
+  const b = tIndex[keyFor(binStart + HOUR)], i = tIndex[keyFor(Math.round(eta / HOUR) * HOUR)];
+  if (b == null || i == null || h.precipitation[b] == null) return null;
+  return {p:h.precipitation[b], prob:h.precipitation_probability[b], code:h.weather_code[b], gust:h.wind_gusts_10m[b],
+          temp:h.temperature_2m[i], wind:h.wind_speed_10m[i], vis:h.visibility[i], binStart};
+}
+/* Between towns: blend the two neighbours by distance (used for the continuous timeline and route colors). */
+function weatherAt(sm, abs){
+  let i = 0; while (i < CITIES.length - 2 && CITIES[i + 1].mi < sm) i++;
+  const a = CITIES[i], b = CITIES[i + 1], f = clamp((sm - a.mi) / ((b.mi - a.mi) || 1), 0, 1);
+  const wa = sample(i, abs), wb = sample(i + 1, abs);
+  if (!wa || !wb) return null;
+  const L = (x, y) => x == null || y == null ? (x ?? y) : x + (y - x) * f;
+  return {p:L(wa.p, wb.p), prob:L(wa.prob, wb.prob), temp:L(wa.temp, wb.temp), wind:L(wa.wind, wb.wind),
+          gust:Math.max(wa.gust ?? 0, wb.gust ?? 0), code:f < .5 ? wa.code : wb.code, binStart:wa.binStart};
+}
+function nearestCity(sm){ let best = CITIES[0]; for (const c of CITIES) if (Math.abs(c.mi - sm) < Math.abs(best.mi - sm)) best = c; return best; }
+function isDark(ci, ms){
+  const s = sun[ci] && sun[ci][dateOf(ms)];
+  return s ? (ms < s[0] || ms > s[1]) : false;
+}
+
+function computeStops(dep){
+  const stops = ordered().map(c => {
+    const miles = milesFor(c), drive = miles / P.speed * 60;
+    const before = P.events.filter(e => e.drive < drive - 1e-9);
+    const brkMin = before.filter(e => e.kind === "rest").reduce((a, e) => a + e.dur, 0);
+    const mealMin = before.filter(e => e.kind === "meal").reduce((a, e) => a + e.dur, 0);
+    const eta = dep + Math.round(drive + brkMin + mealMin) * MIN;
+    const ci = CITIES.indexOf(c), w = sample(ci, eta);
+    return {c, ci, miles, drive, nBrk:before.filter(e => e.kind === "rest").length, brkMin, mealMin, eta, w,
+            cat: w ? category(w.p, w.prob) : "nodata", dark: isDark(ci, eta)};
+  });
+  stops.forEach((s, i) => { const a = stops[i - 1], b = stops[i + 1]; s.span = ((a ? s.drive - a.drive : 0) + (b ? b.drive - s.drive : 0)) / 2; });
+  return stops;
+}
+function routeStats(stops){
+  if (stops.some(s => !s.w)) return null;
+  let wetMin = 0, exposure = 0, worst = "dry", possMin = 0, darkMin = 0;
+  for (const s of stops) {
+    worst = worse(worst, s.cat);
+    if (WET.has(s.cat)) wetMin += s.span;
+    if (s.cat === "possible") possMin += s.span;
+    if (s.dark) darkMin += s.span;
+    exposure += s.span * s.w.p;
+  }
+  return {wetMin, exposure, worst, darkMin, score: exposure + wetMin * 1e-4 + possMin * 1e-6};
+}
+const statsAt = (date, hour) => routeStats(computeStops(toMs(date, hhmm(hour))));
+const roundTo5 = m => Math.max(5, Math.round(m / 5) * 5);
+function exposureText(s){
+  if (!s) return "No forecast";
+  if (!s.wetMin) return s.worst === "possible" ? "Dry, showers possible" : "Dry the whole way";
+  return "~" + fmtDur(roundTo5(s.wetMin)) + " in " + CAT[s.worst].label.toLowerCase();
+}
+
+/* ===================== network ===================== */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function fetchJSON(url, ms){
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+  try {
+    const r = await fetch(url, {signal: ctl.signal});
+    if (!r.ok) { const e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+function forecastUrl(cities){
+  return "https://api.open-meteo.com/v1/forecast?latitude=" + cities.map(c => c.lat.toFixed(4)).join(",") +
+    "&longitude=" + cities.map(c => c.lon.toFixed(4)).join(",") + "&hourly=" + HOURLY_VARS + "&daily=sunrise,sunset" +
+    "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=" + encodeURIComponent(TZ) + "&forecast_days=16";
+}
+async function fetchBatch(cities){
+  for (let attempt = 0; ; attempt++) {
+    try {
+      let j = await fetchJSON(forecastUrl(cities), 30000);
+      if (j && j.error) throw new Error(j.reason || "Open-Meteo error");
+      if (!Array.isArray(j)) j = [j];
+      if (j.length !== cities.length || !j.every(d => d.hourly && d.hourly.time)) throw new Error("Unexpected forecast response");
+      return j;
+    } catch (e) {
+      if ((e.status >= 400 && e.status < 500 && e.status !== 429) || attempt >= 2) throw e;
+      await sleep(800 * 2 ** attempt);
+    }
+  }
+}
+let loading = false;
+async function loadWeather(){
+  if (loading) return;
+  loading = true; setStatus("loading", "Updating");
+  try {
+    const batches = [];
+    for (let i = 0; i < CITIES.length; i += FETCH_BATCH) batches.push(CITIES.slice(i, i + FETCH_BATCH));
+    const data = (await Promise.all(batches.map(fetchBatch))).flat();
+    wx = data.map(d => d.hourly);
+    sun = data.map(d => {
+      const o = {}; const dl = d.daily || {};
+      (dl.time || []).forEach((day, i) => { if (dl.sunrise[i] && dl.sunset[i]) o[day] = [naive(dl.sunrise[i]), naive(dl.sunset[i])]; });
+      return o;
+    });
+    times = wx[0].time;
+    tIndex = Object.create(null); times.forEach((t, i) => tIndex[t] = i);
+    fetchedAt = new Date(); wxFailed = false;
+    const days = [todayLocal(), times[0].slice(0, 10), TRIP_FIRST].sort();
+    let lo = days[2], hi = times[times.length - 1].slice(0, 10);
+    if (hi > TRIP_LAST) hi = TRIP_LAST;
+    if (lo > hi) lo = hi;
+    $("date").min = lo; $("date").max = hi;
+    if (state.date < lo) state.date = lo;
+    if (state.date > hi) state.date = hi;
+    showNotice(null);
+  } catch (e) {
+    wxFailed = true;
+    const why = e.name === "AbortError" ? "The forecast service took too long to respond."
+      : e instanceof TypeError ? "The browser couldn’t reach api.open-meteo.com."
+      : e.status === 429 ? "The forecast service is rate-limiting requests; try again in a minute."
+      : "The forecast service returned an error (" + esc(e.message) + ").";
+    showNotice("<b>Couldn’t load the live forecast.</b> " + why + (wx ? " Showing the forecast from " + fmtClock(fetchedAt) + "." : "") + " Tap refresh to try again.");
+  } finally { loading = false; }
+  setStatus(wxFailed ? "error" : "live", fetchedAt ? (wxFailed ? "From " : "Live · ") + fmtClock(fetchedAt) : "Offline");
+  render();
+}
+async function loadAlerts(){
+  const seen = new Map(); let failed = false;
+  await Promise.all(ALERT_POINTS.map(async c => {
+    try {
+      const j = await fetchJSON("https://api.weather.gov/alerts/active?point=" + c.lat.toFixed(4) + "," + c.lon.toFixed(4), 10000);
+      for (const f of j.features || []) {
+        const p = f.properties || {}, id = p.id || f.id || p.event + p.areaDesc;
+        if (!seen.has(id)) seen.set(id, {event:p.event, area:p.areaDesc, ends:p.ends || p.expires, near:c.name});
+      }
+    } catch (e) { failed = true; }
+  }));
+  alerts = [...seen.values()]; alertsFailed = failed;
+  renderAlerts(); renderHero();
+}
+
+/* ===================== UI plumbing ===================== */
+function setStatus(kind, text){ const el = $("status"); el.dataset.kind = kind; el.querySelector(".lab").textContent = text; $("refresh").classList.toggle("spin", kind === "loading"); }
+function showNotice(html){ const n = $("notice"); n.hidden = !html; n.innerHTML = html || ""; }
+let toastT;
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2200); }
+let rafPending = false;
+function scheduleRender(){
+  if (rafPending) return;
+  rafPending = true;
+  const run = () => { if (!rafPending) return; rafPending = false; render(); };
+  requestAnimationFrame(run); setTimeout(run, 120);   // timer fallback when frames are throttled
+}
+function update(patch, opts = {}){
+  Object.assign(state, patch);
+  if (!opts.keepScrub) { stopPlay(); scrubT = 0; }
+  save(); scheduleRender();
+}
+function applyTheme(){
+  if (state.theme === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = state.theme;
+}
+
+/* ===================== map ===================== */
+let map, markerLayer, routeLayer, carMarker, geo = null;
+function initMap(){
+  map = L.map("map", {zoomControl:true, scrollWheelZoom:false, zoomSnap:.5});
+  map.zoomControl.setPosition("topleft");
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  map.fitBounds(L.latLngBounds(CITIES.map(c => [c.lat, c.lon])), {padding:[28, 28]});
+  routeLayer = L.layerGroup().addTo(map);
+  markerLayer = L.layerGroup().addTo(map);
+  carMarker = L.marker([CITIES[0].lat, CITIES[0].lon], {interactive:false, keyboard:false, zIndexOffset:1000,
+    icon:L.divIcon({className:"car", html:'<span class="halo"></span><span class="core"></span>', iconSize:[18, 18], iconAnchor:[9, 9]})}).addTo(map);
+  map.on("zoomend", () => current.length && renderMarkers());
+  map.on("popupopen", e => {
+    const b = e.popup.getElement().querySelector("[data-detail]");
+    if (b) b.onclick = () => { map.closePopup(); openDetail(Number(b.dataset.detail)); };
+  });
+  setGeometry(CITIES.map(c => [c.lat, c.lon]));
+}
+function hav(a, b){
+  const R = 6371, r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+/* Geometry with each town pinned to its distance along the line, so mileposts map onto the real road shape. */
+function setGeometry(pts){
+  const km = [0];
+  for (let i = 1; i < pts.length; i++) km.push(km[i - 1] + hav(pts[i - 1], pts[i]));
+  const townKm = CITIES.map(c => {
+    let bi = 0, bd = Infinity;
+    for (let i = 0; i < pts.length; i++) { const d = (pts[i][0] - c.lat) ** 2 + (pts[i][1] - c.lon) ** 2; if (d < bd) { bd = d; bi = i; } }
+    return km[bi];
+  });
+  for (let i = 1; i < townKm.length; i++) townKm[i] = Math.max(townKm[i], townKm[i - 1]);
+  geo = {pts, km, townKm};
+}
+function mileToKm(sm){
+  const t = geo.townKm; let i = 0; while (i < CITIES.length - 2 && CITIES[i + 1].mi < sm) i++;
+  const a = CITIES[i], b = CITIES[i + 1], f = clamp((sm - a.mi) / ((b.mi - a.mi) || 1), 0, 1);
+  return t[i] + (t[i + 1] - t[i]) * f;
+}
+function kmToMile(k){
+  const t = geo.townKm; let i = 0; while (i < t.length - 2 && t[i + 1] < k) i++;
+  const f = clamp((k - t[i]) / ((t[i + 1] - t[i]) || 1), 0, 1);
+  return CITIES[i].mi + (CITIES[i + 1].mi - CITIES[i].mi) * f;
+}
+function latLngAtKm(k){
+  const {km, pts} = geo; let lo = 0, hi = km.length - 1;
+  if (k <= 0) return pts[0]; if (k >= km[hi]) return pts[hi];
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (km[mid] < k) lo = mid; else hi = mid; }
+  const f = (k - km[lo]) / ((km[hi] - km[lo]) || 1);
+  return [pts[lo][0] + (pts[hi][0] - pts[lo][0]) * f, pts[lo][1] + (pts[hi][1] - pts[lo][1]) * f];
+}
+async function loadRoute(){
+  try {
+    const j = await fetchJSON("https://router.project-osrm.org/route/v1/driving/" + ROUTE_VIA.map(c => c.lon + "," + c.lat).join(";") + "?overview=full&geometries=geojson", 9000);
+    setGeometry(j.routes[0].geometry.coordinates.map(([lon, lat]) => [lat, lon]));
+  } catch (e) { /* keep the town-to-town line */ }
+  renderRoute(); updateScrub(scrubT);
+}
+/* Route line colored by the weather you'd meet at each point, at the time you'd be there. */
+function renderRoute(){
+  routeLayer.clearLayers();
+  const {pts, km} = geo, step = 1.2;
+  const casing = L.polyline(pts, {color:cssVar("--surface"), weight:9, opacity:.95, interactive:false}).addTo(routeLayer);
+  if (!wx) { L.polyline(pts, {color:cssVar("--faint"), weight:5, interactive:false}).addTo(routeLayer); return casing; }
+  const colors = {}; for (const k of CATS) colors[k] = cssVar(CAT[k].v);
+  let run = [pts[0]], runCat = null, lastKm = -Infinity;
+  const flush = () => { if (run.length > 1) L.polyline(run, {color:colors[runCat || "nodata"], weight:5, opacity:1, lineCap:"round", interactive:false}).addTo(routeLayer); };
+  for (let i = 0; i < pts.length; i++) {
+    if (km[i] - lastKm < step && i !== pts.length - 1) { run.push(pts[i]); continue; }
+    lastKm = km[i];
+    const sm = kmToMile(km[i]), miles = state.dir === "south" ? sm : TOTAL_MI - sm;
+    const t = elapsedAt(miles / P.speed * 60), w = weatherAt(sm, depMs + t * MIN);
+    const cat = w ? category(w.p, w.prob) : "nodata";
+    if (runCat !== null && cat !== runCat) { run.push(pts[i]); flush(); run = [pts[i]]; } else run.push(pts[i]);
+    runCat = cat;
+  }
+  flush();
+}
+function renderMarkers(){
+  markerLayer.clearLayers();
+  const placed = [];
+  const fits = s => {
+    const p = map.latLngToContainerPoint([s.c.lat, s.c.lon]);
+    if (placed.some(q => Math.abs(q.y - p.y) < 22 && Math.abs(q.x - p.x) < 92)) return false;
+    placed.push(p); return true;
+  };
+  const labelled = new Set([current[0], current[current.length - 1], ...current.filter(s => s.c.major)].filter(fits));
+  for (const s of current) {
+    const m = L.circleMarker([s.c.lat, s.c.lon], {radius:s.c.major ? 6.5 : 4.5, color:cssVar("--surface"), weight:2.5, fillColor:cssVar(CAT[s.cat].v), fillOpacity:1});
+    if (labelled.has(s)) m.bindTooltip(fmtTime(s.eta), {permanent:true, direction:"right", className:"tt", offset:[8, 0]});
+    m.bindPopup('<div class="pp"><b>' + esc(s.c.name) + '</b><span class="m">' + fmtTime(s.eta) + ' · mile ' + Math.round(s.miles) + (s.dark ? ' · after dark' : '') + '</span><br>' + weatherLine(s.w) +
+      '<button class="btn" data-detail="' + s.ci + '">Hour by hour</button></div>');
+    m.addTo(markerLayer);
+  }
+}
+function weatherLine(w){
+  if (!w) return '<span class="dim">No forecast for this hour yet</span>';
+  return esc(sky(w.code)) + ', ' + fmtInt(w.temp) + '°F · ' + fmtNum(w.p, 2) + ' in/hr · ' + fmtInt(w.prob) + '% chance';
+}
+
+/* ===================== render ===================== */
+let current = [], series = [], depMs = 0, T = 0, scrubT = 0;
+function render(){
+  syncControls();
+  depMs = toMs(state.date, state.time);
+  P = makePlan();
+  current = computeStops(depMs);
+  T = (current[current.length - 1].eta - depMs) / MIN;
+  scrubT = clamp(scrubT, 0, T);
+  series = buildSeries();
+  renderHero(); renderMatrix(); renderRibbon(); renderRoute(); renderMarkers(); renderAlong();
+  updateScrub(scrubT);
+  syncURL();
+}
+function syncControls(){
+  const south = state.dir === "south";
+  $("fromName").textContent = south ? "Berkeley" : "Thousand Oaks";
+  $("toName").textContent = south ? "Thousand Oaks" : "Berkeley";
+  $("date").value = state.date; $("time").value = state.time;
+  $("speed").value = state.speed; $("speedOut").textContent = state.speed + " mph";
+  $("speed").style.setProperty("--p", ((state.speed - 40) / 30 * 100) + "%");
+  $("breaks").value = state.breaks; $("brkEvery").value = state.brkEvery; $("brkLen").value = state.brkLen;
+  $("customBrk").hidden = state.breaks !== "custom";
+  for (const b of $("meal").children) b.setAttribute("aria-checked", b.dataset.v === String(state.meal));
+  for (const b of $("viewSeg").children) b.setAttribute("aria-pressed", b.dataset.view === state.view);
+  $("stopsView").hidden = state.view !== "stops"; $("dataView").hidden = state.view !== "data";
+}
+
+function buildSeries(){
+  if (!wx) return [];
+  const out = [];
+  for (let t = 0; ; t = Math.min(T, t + STEP)) {
+    const pos = posAt(t), miles = pos.drive * P.speed / 60, sm = southMile(miles), abs = depMs + t * MIN;
+    const w = weatherAt(sm, abs), near = nearestCity(sm);
+    out.push({t, abs, sm, miles, stop:pos.stop, w, near, cat: w ? category(w.p, w.prob) : "nodata", dark:isDark(CITIES.indexOf(near), abs)});
+    if (t >= T) break;
+  }
+  return out;
+}
+
+/* ---------- hero ---------- */
+function heroArt(kind){
+  const cloud = (x, y, s, o, fill = "#fff", cls = "drift") => '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')"><g class="' + cls + '"><path d="M14 34h44a14 14 0 0 0 1.5-27.9A20 20 0 0 0 22 10.5 12 12 0 0 0 14 34z" fill="' + fill + '" opacity="' + o + '"/></g></g>';
+  const sunG = '<g><circle cx="138" cy="46" r="19" fill="#fde68a"/><circle cx="138" cy="46" r="30" fill="#fde68a" opacity=".18"/><g class="rays" stroke="#fde68a" stroke-width="3" stroke-linecap="round" opacity=".75">' +
+    [0,45,90,135,180,225,270,315].map(a => { const r = Math.PI * a / 180; return '<line x1="' + (138 + Math.cos(r) * 27) + '" y1="' + (46 + Math.sin(r) * 27) + '" x2="' + (138 + Math.cos(r) * 35) + '" y2="' + (46 + Math.sin(r) * 35) + '"/>'; }).join("") + '</g></g>';
+  const moon = '<path d="M146 22a24 24 0 1 0 18 40 19 19 0 1 1-18-40z" fill="#fde68a" opacity=".95"/>' +
+    [[40,24],[70,14],[96,40],[60,52],[176,90],[20,60]].map(([x, y], i) => '<circle class="star" cx="' + x + '" cy="' + y + '" r="1.4" fill="#fff" style="animation-delay:' + (i * .45) + 's"/>').join("");
+  const drops = n => '<g>' + Array.from({length:n}, (_, i) => '<line class="drop" x1="' + (78 + i * 13) + '" y1="86" x2="' + (74 + i * 13) + '" y2="98" stroke="#cfe3ff" stroke-width="2" stroke-linecap="round" style="animation-delay:' + ((i * 0.17) % 1.1).toFixed(2) + 's"/>').join("") + '</g>';
+  const svg = inner => '<svg class="art" viewBox="0 0 190 138" aria-hidden="true">' + inner + '</svg>';
+  switch (kind) {
+    case "clear": return svg(sunG + cloud(28, 70, .7, .35, "#fff", "drift slow"));
+    case "possible": return svg(sunG + cloud(78, 44, 1.25, .92) + cloud(20, 74, .7, .45, "#fff", "drift slow"));
+    case "rain": return svg(cloud(64, 30, 1.6, .9, "#e5edf8") + cloud(18, 60, .9, .5, "#cbd5e1", "drift slow") + drops(7));
+    case "storm": return svg(cloud(60, 26, 1.7, .9, "#94a3b8") + drops(7) + '<path class="bolt" d="M120 74l-12 20h10l-6 18 18-24h-11l7-14z" fill="#fde047"/>');
+    case "night": return svg(moon + cloud(30, 74, .7, .25, "#fff", "drift slow"));
+    default: return svg(cloud(64, 34, 1.5, .5));
+  }
+}
+function renderHero(){
+  const el = $("hero");
+  if (!current.length) return;
+  const route = '<div class="route"><svg><use href="#i-pin"/></svg>' + esc(current[0].c.name) + ' → ' + esc(current[current.length - 1].c.name) + ' · ' + fmtDay(depMs) + '</div>';
+  if (!wx) {
+    el.dataset.sky = "none";
+    el.innerHTML = heroArt("none") + route + (wxFailed ? '<h1>Forecast unavailable</h1><p class="lede">Check your connection and tap refresh.</p>' :
+      '<div class="skel" style="height:30px;width:70%;margin:14px 0 8px"></div><div class="skel" style="height:14px;width:85%"></div><div class="hk">' + '<div><div class="skel" style="height:38px"></div></div>'.repeat(4) + '</div>');
+    return;
+  }
+  const last = current[current.length - 1], st = routeStats(current), totalMin = T, stopMin = last.brkMin + last.mealMin;
+  let worst = "nodata", peak = null, gust = null, maxProb = 0;
+  for (const s of current) if (s.w) {
+    worst = worse(worst, s.cat); maxProb = Math.max(maxProb, s.w.prob ?? 0);
+    if (!peak || s.w.p > peak.w.p) peak = s;
+    if (!gust || s.w.gust > gust.w.gust) gust = s;
+  }
+  const anyData = current.some(s => s.w), wetNames = current.filter(s => WET.has(s.cat)).map(s => s.c.name);
+  let title, lede;
+  if (!anyData) { title = "Beyond the forecast range"; lede = "Pick a date within the next two weeks."; }
+  else if (WET.has(worst)) {
+    title = CAT[worst].label + " on part of the drive";
+    lede = "Rain near " + listNames(wetNames) + ". Heaviest " + fmtNum(peak.w.p, 2) + " in/hr near " + peak.c.name + " around " + fmtTime(peak.eta) + ".";
+  } else if (worst === "possible") { title = "Mostly dry, showers possible"; lede = "No measurable rain where you’ll be, but chances reach " + Math.round(maxProb) + "% along the way."; }
+  else { title = "Dry the whole way"; lede = "No measurable rain forecast at any town when you pass it."; }
+  if (anyData && !st) lede += " Part of the drive is past the end of the forecast.";
+  const darkStart = isDark(current[0].ci, depMs);
+  el.dataset.sky = worst === "heavy" ? "storm" : WET.has(worst) ? "rain" : darkStart ? "night" : worst === "possible" ? "possible" : worst === "dry" ? "clear" : "none";
+
+  const lead = (depMs - nowLocal()) / 86400000;
+  const conf = lead < -0.05 ? "Departure has passed" : lead <= 2 ? "High confidence" : lead <= 5 ? "Moderate confidence" : "Low confidence";
+  const tags = ['<span class="htag">' + conf + '</span>'];
+  const destSun = sun[last.ci] && sun[last.ci][dateOf(last.eta)];
+  if (st && st.darkMin > 2) tags.push('<span class="htag"><svg><use href="#i-moon"/></svg>~' + fmtDur(roundTo5(st.darkMin)) + ' after dark</span>');
+  else if (destSun) tags.push('<span class="htag"><svg><use href="#i-sun"/></svg>Sunset ' + fmtTime(destSun[1]) + '</span>');
+  if (gust && gust.w.gust >= 30) tags.push('<span class="htag warn">Gusts ' + Math.round(gust.w.gust) + ' mph near ' + esc(gust.c.name) + '</span>');
+  if (alerts.length) tags.push('<button class="htag warn" id="toAlerts"><svg><use href="#i-warn"/></svg>' + alerts.length + ' NWS alert' + (alerts.length > 1 ? 's' : '') + '</button>');
+
+  el.innerHTML = heroArt(el.dataset.sky) + route + '<h1>' + esc(title) + '</h1><p class="lede">' + esc(lede) + '</p>' +
+    '<div class="hk">' +
+      hk("Leave", fmtTime(depMs), fmtWd(depMs) + " " + new Date(depMs).getUTCDate()) +
+      hk("Arrive", fmtTime(last.eta), dateOf(last.eta) === dateOf(depMs) ? last.c.name : fmtDay(last.eta)) +
+      hk("Trip", fmtDurShort(totalMin), stopMin ? fmtDurShort(stopMin) + " stopped" : TOTAL_MI + " mi") +
+      hk("In rain", st ? (st.wetMin ? "~" + fmtDurShort(roundTo5(st.wetMin)) : "None") : "–", st ? "of " + fmtDurShort(last.drive) + " driving" : "") +
+    '</div><div class="htags">' + tags.join("") + '</div>';
+  const ta = $("toAlerts"); if (ta) ta.onclick = () => $("alerts").scrollIntoView({behavior:"smooth", block:"start"});
+}
+const hk = (k, v, s) => '<div><span>' + k + '</span><b>' + v + '</b><small>' + esc(s) + '</small></div>';
+function listNames(a){ return a.length <= 3 ? a.join(", ") : a.slice(0, 2).join(", ") + " and " + (a.length - 2) + " more"; }
+
+/* ---------- departure matrix ---------- */
+let grid = null;
+function cellFill(s){
+  if (!s) return "var(--surface-3)";
+  if (!WET.has(s.worst)) return "color-mix(in srgb,var(" + CAT[s.worst].v + ") " + (s.worst === "dry" ? 26 : 38) + "%,var(--surface))";
+  return "color-mix(in srgb,var(" + CAT[s.worst].v + ") " + Math.round(40 + 60 * Math.min(1, s.wetMin / 120)) + "%,var(--surface))";
+}
+function renderMatrix(){
+  const m = $("matrix");
+  $("mxlegend").innerHTML = ["dry","possible","light","moderate","heavy"].map(k => '<span><i style="background:' + cellFill({worst:k, wetMin:60}) + '"></i>' + CAT[k].label + '</span>').join("") +
+    '<span style="margin-left:auto">Deeper = longer in rain · <b style="color:var(--ink)">●</b> best that day</span>';
+  if (!wx) { m.innerHTML = '<div class="skel dark" style="height:300px"></div>'; $("best").innerHTML = ""; $("mxsel").textContent = ""; return; }
+  const dates = [...new Set(times.map(t => t.slice(0, 10)))].filter(d => d >= todayLocal() && d >= TRIP_FIRST && d <= TRIP_LAST);
+  grid = dates.map(d => {
+    const now = nowLocal();
+    const row = PLAN_HOURS.map(h => { const past = toMs(d, hhmm(h)) < now; return {d, h, past, s: past ? null : statsAt(d, h)}; });
+    let best = null; for (const c of row) if (c.s && (!best || c.s.score < best.s.score)) best = c;
+    if (best) best.best = true;
+    return {d, row, best};
+  }).filter(r => r.row.some(c => !c.past));
+  const selH = Number(state.time.slice(0, 2)), selM = state.time.slice(3) === "00";
+  let html = '<div class="mx" style="--cols:' + PLAN_HOURS.length + '"><div></div>' +
+    PLAN_HOURS.map(h => '<div class="hl">' + fmtHour(toMs("2000-01-01", hhmm(h)), true) + '</div>').join("");
+  const today = todayLocal();
+  for (const r of grid) {
+    const ms = toMs(r.d, "12:00");
+    html += '<div class="dl' + (r.d === today ? ' today' : '') + '"><b>' + (r.d === today ? "Today" : fmtWd(ms)) + '</b>' + (r.d === today ? '' : '<small>' + new Date(ms).getUTCDate() + '</small>') + '</div>';
+    for (const c of r.row) {
+      const sel = r.d === state.date && c.h === selH && selM;
+      html += '<button class="cell' + (c.best ? ' best' : '') + (c.s ? '' : ' na') + '" data-d="' + r.d + '" data-h="' + c.h + '" aria-pressed="' + sel + '" style="background:' + cellFill(c.s) + '" aria-label="' +
+        esc(fmtDay(ms) + " " + fmtHour(toMs(r.d, hhmm(c.h))) + ": " + (c.past ? "already passed" : exposureText(c.s))) + '"' + (c.s ? '' : ' disabled') + '></button>';
+    }
+  }
+  m.innerHTML = html + '</div>';
+
+  // Best departure in the next 7 days
+  let wk = null;
+  for (const r of grid) for (const c of r.row) if (c.s && (!wk || c.s.score < wk.s.score)) wk = c;
+  if (wk) {
+    const dep = toMs(wk.d, hhmm(wk.h)), arr = computeStops(dep).pop().eta, isSel = wk.d === state.date && state.time === hhmm(wk.h);
+    $("best").innerHTML = '<div class="best"><div class="bi"><svg><use href="#i-spark"/></svg></div><div class="bt"><span>Best departure, Nov 23–29</span><b>' + fmtDay(dep) + ' at ' + fmtTime(dep) + '</b><small>' +
+      esc(exposureText(wk.s)) + ' · arrive ' + fmtTime(arr) + '</small></div><button class="btn' + (isSel ? '' : ' primary') + '" id="useBest"' + (isSel ? ' disabled' : '') + '>' + (isSel ? 'Selected' : 'Use') + '</button></div>';
+    if (!isSel) $("useBest").onclick = () => update({date:wk.d, time:hhmm(wk.h)});
+  } else $("best").innerHTML = "";
+  const s = routeStats(current);
+  $("mxsel").innerHTML = '<span class="sw" style="background:var(' + CAT[s ? s.worst : "nodata"].v + ')"></span><span><b>' + fmtDay(depMs) + ', ' + fmtTime(depMs) + '</b> → arrive ' + fmtTime(current[current.length - 1].eta) + ' · ' + esc(exposureText(s)) + '</span>';
+}
+
+/* ---------- drive ribbon ---------- */
+function smooth(pts){
+  // Monotone cubic interpolation (no overshoot), returns an SVG path.
+  const n = pts.length; if (n < 2) return "";
+  const dx = [], m = [], s = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = pts[i + 1][0] - pts[i][0]; s[i] = (pts[i + 1][1] - pts[i][1]) / (dx[i] || 1); }
+  m[0] = s[0]; m[n - 1] = s[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = s[i - 1] * s[i] <= 0 ? 0 : 3 * (dx[i - 1] + dx[i]) / ((2 * dx[i] + dx[i - 1]) / s[i - 1] + (dx[i] + 2 * dx[i - 1]) / s[i]);
+  let d = "M" + pts[0][0].toFixed(1) + "," + pts[0][1].toFixed(1);
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    d += "C" + (pts[i][0] + h).toFixed(1) + "," + (pts[i][1] + m[i] * h).toFixed(1) + " " + (pts[i + 1][0] - h).toFixed(1) + "," + (pts[i + 1][1] - m[i + 1] * h).toFixed(1) + " " + pts[i + 1][0].toFixed(1) + "," + pts[i + 1][1].toFixed(1);
+  }
+  return d;
+}
+let RB = null;   // ribbon geometry for the scrubber
+let drawnOnce = false;
+function renderRibbon(){
+  const el = $("ribbon");
+  const W = Math.max(280, el.clientWidth || 600);
+  if (!series.length) { el.innerHTML = '<div class="skel dark" style="height:220px"></div>'; RB = null; return; }
+  const m = {l:56, r:12, t:6}, pw = W - m.l - m.r;
+  const tracks = {rain:{y:6, h:62}, temp:{y:82, h:46}, gust:{y:140, h:12}, chance:{y:158, h:10}, light:{y:174, h:10}};
+  const axisY = 194, H = 228;
+  const x = t => m.l + (T ? t / T : 0) * pw;
+  const ok = series.filter(p => p.w);
+  const maxP = Math.max(0.10, ...ok.map(p => p.w.p)) * 1.1;
+  const temps = ok.map(p => p.w.temp), tMin = Math.floor(Math.min(...temps) - 1), tMax = Math.ceil(Math.max(...temps) + 1);
+  const yR = v => tracks.rain.y + tracks.rain.h - v / maxP * tracks.rain.h;
+  const yT = v => tracks.temp.y + tracks.temp.h - (v - tMin) / ((tMax - tMin) || 1) * tracks.temp.h;
+  let g = '<defs><linearGradient id="rainFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--moderate)" stop-opacity=".55"/><stop offset="1" stop-color="var(--light)" stop-opacity=".08"/></linearGradient>' +
+    '<pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--stop-band)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--faint)" stroke-width="1" opacity=".35"/></pattern></defs>';
+  // night shading behind all tracks
+  let runStart = null;
+  series.forEach((p, i) => {
+    if (p.dark && runStart === null) runStart = p.t;
+    if ((!p.dark || i === series.length - 1) && runStart !== null) { const end = p.t; g += '<rect class="night" x="' + x(runStart) + '" y="0" width="' + Math.max(1, x(end) - x(runStart)) + '" height="' + axisY + '"/>'; runStart = null; }
+  });
+  // stops
+  for (const e of P.events) if (e.start < T) {
+    const x0 = x(e.start), x1 = x(Math.min(T, e.start + e.dur));
+    g += '<rect class="stopb" x="' + x0 + '" y="0" width="' + Math.max(1.5, x1 - x0) + '" height="' + axisY + '"/>';
+  }
+  // hour grid + axis labels
+  const firstHour = Math.ceil(depMs / HOUR) * HOUR, every = pw / (T / 60) < 34 ? 2 : 1;
+  for (let ms = firstHour, k = 0; ms <= depMs + T * MIN; ms += HOUR, k++) {
+    const xx = x((ms - depMs) / MIN);
+    g += '<line class="grid" x1="' + xx + '" x2="' + xx + '" y1="0" y2="' + axisY + '"/>';
+    if (k % every === 0) g += '<text class="lbl" x="' + xx + '" y="' + (axisY + 13) + '" text-anchor="middle">' + fmtHour(ms, true) + '</text>';
+  }
+  // track labels
+  g += '<text class="trk" x="0" y="' + (tracks.rain.y + 9) + '">Rain</text><text class="lbl" x="0" y="' + (tracks.rain.y + 22) + '">' + maxP.toFixed(2) + '</text><text class="lbl" x="0" y="' + (tracks.rain.y + tracks.rain.h) + '">0 in</text>';
+  g += '<text class="trk" x="0" y="' + (tracks.temp.y + 9) + '">Temp</text><text class="lbl" x="0" y="' + (tracks.temp.y + 22) + '">' + tMax + '°</text><text class="lbl" x="0" y="' + (tracks.temp.y + tracks.temp.h) + '">' + tMin + '°</text>';
+  g += '<text class="trk" x="0" y="' + (tracks.gust.y + 9) + '">Gusts</text><text class="trk" x="0" y="' + (tracks.chance.y + 9) + '">Chance</text><text class="trk" x="0" y="' + (tracks.light.y + 9) + '">Daylight</text>';
+  // baselines
+  g += '<line class="base" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + (tracks.rain.y + tracks.rain.h) + '" y2="' + (tracks.rain.y + tracks.rain.h) + '"/>';
+  // rain area
+  const rp = ok.map(p => [x(p.t), yR(p.w.p)]);
+  if (rp.length > 1) {
+    const line = smooth(rp), base = tracks.rain.y + tracks.rain.h;
+    g += '<path class="rain" style="stroke:none" d="' + line + 'L' + rp[rp.length - 1][0] + ',' + base + 'L' + rp[0][0] + ',' + base + 'Z"/>';
+    g += '<path d="' + line + '" fill="none" stroke="var(--moderate)" stroke-width="1.5"/>';
+  }
+  // temperature line
+  const tp = ok.map(p => [x(p.t), yT(p.w.temp)]), tl = smooth(tp);
+  g += '<path class="temp' + (drawnOnce ? '' : ' draw') + '" style="--len:' + Math.ceil(pw * 2) + '" d="' + tl + '"/>';
+  // chance strip and daylight strip
+  const cw = Math.max(1, pw / Math.max(1, series.length - 1));
+  for (const p of series) {
+    const xx = x(p.t) - cw / 2;
+    if (p.w) g += '<rect x="' + xx.toFixed(1) + '" y="' + tracks.chance.y + '" width="' + (cw + .4).toFixed(1) + '" height="' + tracks.chance.h + '" fill="var(--chance)" opacity="' + (0.06 + (p.w.prob ?? 0) / 100 * .9).toFixed(2) + '"/>';
+    g += '<rect x="' + xx.toFixed(1) + '" y="' + tracks.light.y + '" width="' + (cw + .4).toFixed(1) + '" height="' + tracks.light.h + '" fill="' + (p.dark ? "var(--night)" : "#fbbf24") + '" opacity="' + (p.dark ? .85 : .55) + '"/>';
+  }
+  // gusts: a dot per sample sized by speed; labelled peaks at 30+ mph
+  let lastFlag = -1e9;
+  const gy = tracks.gust.y + tracks.gust.h / 2;
+  g += '<line class="grid" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + gy + '" y2="' + gy + '"/>';
+  for (const p of ok) if (p.w.gust >= 20) {
+    const r = clamp((p.w.gust - 15) / 8, 1.2, 5);
+    g += '<circle cx="' + x(p.t).toFixed(1) + '" cy="' + gy + '" r="' + r.toFixed(1) + '" fill="' + (p.w.gust >= 30 ? 'var(--heavy)' : 'var(--faint)') + '" opacity=".8"/>';
+  }
+  for (const p of ok) if (p.w.gust >= 30 && p.t - lastFlag > 50) {
+    lastFlag = p.t;
+    g += '<text class="lbl strong" x="' + (x(p.t) + 7) + '" y="' + (gy + 3.5) + '">' + Math.round(p.w.gust) + '</text>';
+  }
+  // town ticks (direct labels for majors, collision-avoided)
+  let lastLx = -1e9;
+  for (const s of current) {
+    const xx = x((s.eta - depMs) / MIN);
+    g += '<line x1="' + xx + '" x2="' + xx + '" y1="' + (axisY + 18) + '" y2="' + (axisY + 22) + '" stroke="var(--faint)"/>';
+    if (s.c.major && xx - lastLx > 64 && xx < W - 20) { g += '<text class="lbl strong" x="' + xx + '" y="' + (axisY + 33) + '" text-anchor="middle">' + esc(s.c.name.replace("San Luis Obispo", "SLO").replace("Thousand Oaks", "T. Oaks").replace("Santa Barbara", "S. Barbara")) + '</text>'; lastLx = xx; }
+  }
+  // cursor
+  g += '<g class="cur" id="rcur"><line y1="0" y2="' + axisY + '"/><circle id="rcR" r="4.5" fill="var(--moderate)"/><circle id="rcT" r="4.5" fill="var(--temp)"/></g>';
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + (H + 18) + '" height="' + (H + 18) + '" aria-hidden="true">' + g + '</svg>';
+  RB = {x, yR, yT, m, pw, W};
+  el.setAttribute("aria-valuemax", Math.round(T));
+  drawnOnce = true;
+}
+function seriesAt(t){
+  if (!series.length) return null;
+  const i = clamp(Math.round(t / STEP), 0, series.length - 1);
+  let p = series[i];
+  if (Math.abs(p.t - t) > STEP / 2) p = series.reduce((a, b) => Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a);
+  return p;
+}
+function updateScrub(t){
+  scrubT = clamp(t, 0, T);
+  const pos = posAt(scrubT), miles = pos.drive * P.speed / 60, sm = southMile(miles), abs = depMs + scrubT * MIN;
+  if (geo && carMarker) carMarker.setLatLng(latLngAtKm(mileToKm(sm)));
+  const p = seriesAt(scrubT), near = nearestCity(sm);
+  const place = scrubT <= 0 ? "Leaving " + current[0].c.name : scrubT >= T ? "Arriving " + current[current.length - 1].c.name : (pos.stop ? (pos.stop.kind === "meal" ? "Meal stop" : "Rest break") : "Near " + near.name);
+  const w = p && p.w;
+  $("readout").innerHTML = '<div class="t">' + fmtTime(abs) + ' <em>· ' + esc(place) + ' · mile ' + Math.round(miles) + '</em></div>' +
+    '<div class="w">' + (w ? '<span class="sw" style="background:var(' + CAT[p.cat].v + ')"></span>' + icon(w.code) + esc(sky(w.code)) + ' · ' + fmtInt(w.temp) + '° · ' + fmtNum(w.p, 2) + ' in/hr · ' + fmtInt(w.prob) + '%' + (p.dark ? ' · after dark' : '')
+      : '<span class="dim">' + (wx ? 'No forecast for this time' : 'Loading forecast…') + '</span>') + '</div>';
+  $("ribbon").setAttribute("aria-valuenow", Math.round(scrubT));
+  $("ribbon").setAttribute("aria-valuetext", $("readout").textContent);
+  if (RB && w) {
+    const xx = RB.x(scrubT), cur = $("rcur");
+    cur.querySelector("line").setAttribute("x1", xx); cur.querySelector("line").setAttribute("x2", xx);
+    $("rcR").setAttribute("cx", xx); $("rcR").setAttribute("cy", RB.yR(w.p));
+    $("rcT").setAttribute("cx", xx); $("rcT").setAttribute("cy", RB.yT(w.temp));
+  }
+}
+let playing = null;
+function stopPlay(){ if (playing) { cancelAnimationFrame(playing.raf); playing = null; } setPlayBtn(false); }
+function setPlayBtn(on){ const b = $("play"); b.querySelector("use").setAttribute("href", on ? "#i-pause" : "#i-play"); b.querySelector("span").textContent = on ? "Pause" : "Play"; b.setAttribute("aria-label", on ? "Pause" : "Play the drive"); }
+function togglePlay(){
+  if (playing) return stopPlay();
+  if (scrubT >= T - 0.5) scrubT = 0;
+  const dur = 10000 * (1 - scrubT / T), t0 = performance.now(), s0 = scrubT;
+  playing = {};
+  const tick = now => {
+    const f = Math.min(1, (now - t0) / dur);
+    updateScrub(s0 + (T - s0) * f);
+    if (f < 1 && playing) playing.raf = requestAnimationFrame(tick); else stopPlay();
+  };
+  playing.raf = requestAnimationFrame(tick); setPlayBtn(true);
+}
+
+/* ---------- along the way ---------- */
+function renderAlong(){
+  $("alongSub").textContent = current.length + " towns · " + (P.events.length ? P.events.length + " stop" + (P.events.length > 1 ? "s" : "") : "no stops") + " · " + TOTAL_MI + " mi";
+  if (state.view === "stops") renderStops(); else renderData();
+}
+function renderStops(){
+  const items = current.map(s => ({t:(s.eta - depMs) / MIN, s}))
+    .concat(P.events.filter(e => e.start < T).map(e => ({t:e.start + 1e-6, e})))
+    .sort((a, b) => a.t - b.t);
+  $("stopsView").innerHTML = '<ol class="tline">' + items.map(it => {
+    if (it.e) {
+      const e = it.e, at = depMs + e.start * MIN, near = nearestCity(e.sm);
+      return '<li class="evt"><div class="tm">' + fmtTime(at) + '</div><div class="nd"><i><svg><use href="#i-' + (e.kind === "meal" ? "fork" : "cup") + '"/></svg></i></div>' +
+        '<div class="ev"><b>' + (e.kind === "meal" ? "Meal stop" : "Rest break") + '</b> · ' + fmtDur(e.dur) + ' · ' + (e.kind === "meal" ? "in " : "near ") + esc(near.name) + '</div></li>';
+    }
+    const s = it.s, w = s.w;
+    return '<li class="' + (s.c.major ? 'major' : '') + '"><div class="tm">' + fmtTime(s.eta) + '</div><div class="nd" style="--c:var(' + CAT[s.cat].v + ')"><i></i></div>' +
+      '<button class="bd" data-detail="' + s.ci + '"><div class="tx"><div class="n">' + esc(s.c.name) + '</div><div class="s">' + CAT[s.cat].label + (w && w.prob != null ? ' · ' + w.prob + '%' : '') + (s.dark ? ' · after dark' : '') + '</div>' +
+      (s.c.note ? '<div class="note">' + esc(s.c.note) + '</div>' : '') + '</div><div class="w">' + (w ? icon(w.code) + fmtInt(w.temp) + '°' : '') + '</div></button></li>';
+  }).join("") + '</ol>';
+}
+function renderData(){
+  const last = current[current.length - 1], [every, len] = breakPlan();
+  const calc = [["Driving", TOTAL_MI + " mi ÷ " + P.speed + " mph = " + fmtDur(last.drive)]];
+  if (last.nBrk) calc.push(["Rest breaks", last.nBrk + " × " + len + " min (every " + every + " min driving) = " + fmtDur(last.brkMin)]);
+  if (last.mealMin) calc.push(["Meal in SLO", fmtDur(last.mealMin)]);
+  const rows = current.map(s => {
+    const w = s.w;
+    return '<tr data-detail="' + s.ci + '"><td><span class="sw" style="background:var(' + CAT[s.cat].v + ')"></span>' + esc(s.c.name) + '</td><td>' + fmtTime(s.eta) + '</td>' +
+      (w ? '<td>' + fmtNum(w.p, 3) + '</td><td>' + fmtInt(w.prob) + '%</td><td>' + fmtInt(w.temp) + '°</td><td>' + fmtInt(w.wind) + ' / ' + fmtInt(w.gust) + '</td>' +
+           '<td class="l">' + esc(sky(w.code)) + ' <span class="dim">(' + w.code + ')</span></td><td class="dim">' + fmtHour(w.binStart, true) + '–' + fmtHour(w.binStart + HOUR, true) + '</td>'
+         : '<td colspan="6" class="l dim">Beyond the forecast range</td>') +
+      '<td>' + (s.dark ? 'Night' : 'Day') + '</td><td>' + Math.round(s.miles) + '</td><td class="dim">' + fmtDur((s.eta - depMs) / MIN) + '</td></tr>';
+  }).join("");
+  $("dataView").innerHTML =
+    '<div class="calc">' + calc.map(([k, v]) => '<span>' + k + '</span><span>' + v + '</span>').join("") +
+      '<span class="tot">Door to door</span><span class="tot">' + fmtDur(T) + ' · arrive ' + fmtTime(last.eta) + '</span></div>' +
+    '<div class="tablewrap"><table class="data"><thead><tr><th>Town</th><th>Arrive</th><th>Rain in/hr</th><th>Chance</th><th>Temp</th><th>Wind / gust</th><th class="l">Sky (WMO)</th><th>Rain hour</th><th>Light</th><th>Mile</th><th>Elapsed</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<p class="hint">Rain, chance, gusts and sky are Open-Meteo’s values for the hour you’re driving through (“Rain hour”); temperature and wind use the nearest hour; “Light” uses that town’s sunrise and sunset. ' +
+      'Light rain is under 0.10 in/hr, moderate 0.10–0.30, heavy 0.30+; under 0.005 counts as dry, or “possible” at 40%+ chance. The drive chart and route colors blend the two nearest towns. Tap a row for that town’s day.</p>' +
+    '<div class="foot"><span class="hint" style="margin:0">Fetched ' + (fetchedAt ? fetchedAt.toLocaleString("en-US",{weekday:"short",hour:"numeric",minute:"2-digit"}) : "–") + '</span>' +
+      '<button class="btn" id="csv"><svg><use href="#i-down"/></svg>Download CSV</button></div>';
+  $("csv").onclick = downloadCsv;
+}
+function downloadCsv(){
+  const head = ["town","mile","arrive_local","rain_hour_start","precip_in_per_hr","precip_prob_pct","weather_code","conditions","temp_f","wind_mph","gust_mph","daylight","lat","lon"];
+  const q = v => /[",\n]/.test(String(v ?? "")) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v ?? "");
+  const iso = ms => new Date(ms).toISOString().slice(0, 16);
+  const lines = [head.join(",")].concat(current.map(s => [s.c.name, Math.round(s.miles), iso(s.eta), s.w ? iso(s.w.binStart) : "", s.w?.p, s.w?.prob, s.w?.code, s.w ? sky(s.w.code) : "",
+    s.w?.temp, s.w?.wind, s.w?.gust, s.dark ? "night" : "day", s.c.lat, s.c.lon].map(q).join(",")));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], {type:"text/csv"}));
+  a.download = "us101-" + state.dir + "-" + state.date + "-" + state.time.replace(":", "") + ".csv";
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/* ---------- alerts ---------- */
+function renderAlerts(){
+  const el = $("alerts");
+  el.hidden = !alerts.length;
+  if (!alerts.length) return;
+  const rank = a => /warning/i.test(a.event) ? 0 : /watch/i.test(a.event) ? 1 : 2;
+  const until = a => a.ends ? "until " + new Date(a.ends).toLocaleString("en-US",{weekday:"short",hour:"numeric",timeZone:TZ}).replace(" AM"," am").replace(" PM"," pm") : "";
+  el.innerHTML = '<div class="ch"><div><h2 id="alertsH">Weather alerts</h2><p>Active now from the National Weather Service. Tap one for the affected areas.</p></div></div>' +
+    [...alerts].sort((a, b) => rank(a) - rank(b)).map(a =>
+      '<details class="alert"><summary><span class="ai' + (rank(a) === 2 ? ' mod' : '') + '"><svg><use href="#i-warn"/></svg></span><span><b>' + esc(a.event) + '</b> <em>· ' + esc(a.near) + '</em></span><small>' + esc(until(a)) + '</small></summary>' +
+      '<p>' + esc(a.area) + '</p></details>').join("");
+}
+
+/* ---------- detail sheet ---------- */
+let lastFocus = null;
+function openDetail(ci){
+  const s = current.find(x => x.ci === ci); if (!s) return;
+  const c = s.c, h = wx && wx[ci], day = dateOf(s.eta), youBin = Math.floor(s.eta / HOUR) * HOUR;
+  const hrs = [];
+  if (h) for (let hr = 4; hr <= 23; hr++) {
+    const start = toMs(day, hhmm(hr)), b = tIndex[keyFor(start + HOUR)], i = tIndex[keyFor(start)];
+    if (b == null || i == null) continue;
+    hrs.push({start, p:h.precipitation[b] ?? 0, prob:h.precipitation_probability[b], code:h.weather_code[b], gust:h.wind_gusts_10m[b], temp:h.temperature_2m[i], wind:h.wind_speed_10m[i],
+      cat:category(h.precipitation[b], h.precipitation_probability[b]), dark:isDark(ci, start + HOUR / 2), you:start === youBin});
+  }
+  const nws = "https://forecast.weather.gov/MapClick.php?lat=" + c.lat + "&lon=" + c.lon, w = s.w;
+  $("sheetPanel").innerHTML = '<div class="grab"></div>' +
+    '<header><div><h3 id="sheetTitle">' + esc(c.name) + '</h3><p>Mile ' + Math.round(s.miles) + ' · arrive ' + fmtTime(s.eta) + ', ' + fmtDay(s.eta) + ' · ' + fmtDur(s.drive) + ' driving' + (s.brkMin + s.mealMin ? ' + ' + fmtDur(s.brkMin + s.mealMin) + ' stopped' : '') + '</p></div>' +
+      '<button class="ibtn" id="closeSheet" aria-label="Close"><svg><use href="#i-x"/></svg></button></header>' +
+    (w ? '<div class="now">' + icon(w.code, "ic big") + '<div class="tv">' + fmtInt(w.temp) + '°</div><div class="cv"><b>' + esc(sky(w.code)) + '</b>' + fmtNum(w.p, 2) + ' in/hr · ' + fmtInt(w.prob) + '% chance · wind ' + fmtInt(w.wind) + ', gusts ' + fmtInt(w.gust) + ' mph' +
+      (w.vis != null && w.vis < 16000 ? ' · visibility ' + fmtNum(w.vis / 1609, 1) + ' mi' : '') + '</div></div>' : '<p class="hint">No forecast for this hour yet.</p>') +
+    (c.note ? '<p class="hint" style="margin:0 0 10px">' + esc(c.note) + '</p>' : '') +
+    (hrs.length ? '<div class="eyebrow" style="margin-top:6px">' + fmtDay(s.eta) + ' hour by hour</div><div class="mini" id="mini"></div>' +
+      '<table class="hrs"><thead><tr><th>Hour</th><th class="l">Sky</th><th>Rain in</th><th>Chance</th><th>Temp</th><th>Wind / gust</th></tr></thead><tbody>' +
+      hrs.map(r => '<tr' + (r.you ? ' class="you"' : '') + '><td>' + fmtHour(r.start) + '</td><td class="l" title="' + esc(sky(r.code)) + '">' + icon(r.code) + '<span class="skyt">' + esc(sky(r.code)) + '</span></td><td>' + fmtNum(r.p, 2) + '</td><td>' + fmtInt(r.prob) + '%</td><td>' + fmtInt(r.temp) + '°</td><td>' + fmtInt(r.wind) + ' / ' + fmtInt(r.gust) + '</td></tr>').join("") +
+      '</tbody></table><p class="hint">Highlighted row is the hour you pass through. Each row covers the hour starting at that time.</p>' : '') +
+    '<div class="links"><a class="btn" href="' + esc(forecastUrl([c])) + '" target="_blank" rel="noopener"><svg><use href="#i-ext"/></svg>Raw Open-Meteo data</a>' +
+      '<a class="btn" href="' + esc(nws) + '" target="_blank" rel="noopener"><svg><use href="#i-ext"/></svg>Compare with NWS</a></div>';
+  lastFocus = document.activeElement;
+  $("sheet").classList.add("open"); $("sheet").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  $("closeSheet").onclick = closeDetail; $("closeSheet").focus({preventScroll:true});
+  if (hrs.length) requestAnimationFrame(() => drawMini(hrs));
+}
+function drawMini(hrs){
+  const el = $("mini"); if (!el) return;
+  const W = el.clientWidth || 600, H = 128, m = {l:30, r:6, t:8, b:18}, pw = W - m.l - m.r;
+  const n = hrs.length, bw = pw / n, maxP = Math.max(0.10, ...hrs.map(r => r.p)) * 1.1;
+  const rainH = 44, tempTop = m.t + rainH + 16, tempH = H - m.b - tempTop;
+  const temps = hrs.map(r => r.temp), tMin = Math.floor(Math.min(...temps)), tMax = Math.ceil(Math.max(...temps));
+  let g = "";
+  hrs.forEach((r, i) => {
+    const x0 = m.l + i * bw;
+    if (r.dark) g += '<rect x="' + x0 + '" y="0" width="' + (bw + .5) + '" height="' + (H - m.b) + '" fill="var(--night-band)"/>';
+    if (r.you) g += '<rect x="' + x0 + '" y="0" width="' + bw + '" height="' + (H - m.b) + '" fill="var(--ink)" opacity=".07" rx="4"/>';
+    const bh = Math.max(r.p > 0 ? 2 : 0, r.p / maxP * rainH);
+    if (bh) g += '<rect x="' + (x0 + 2) + '" y="' + (m.t + rainH - bh) + '" width="' + Math.max(2, bw - 4) + '" height="' + bh + '" rx="2" fill="var(' + CAT[r.cat].v + ')"/>';
+    if (i % 3 === 0) g += '<text class="lbl" x="' + (x0 + bw / 2) + '" y="' + (H - 4) + '" text-anchor="middle">' + fmtHour(r.start, true) + '</text>';
+  });
+  g += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + (m.t + rainH) + '" y2="' + (m.t + rainH) + '" stroke="var(--line-2)"/>';
+  const yT = v => tempTop + tempH - (v - tMin) / ((tMax - tMin) || 1) * tempH;
+  g += '<path d="' + smooth(hrs.map((r, i) => [m.l + i * bw + bw / 2, yT(r.temp)])) + '" fill="none" stroke="var(--temp)" stroke-width="2"/>';
+  g += '<text class="lbl" x="0" y="' + (m.t + 9) + '">' + maxP.toFixed(2) + '</text><text class="lbl" x="0" y="' + (m.t + rainH) + '">0 in</text>';
+  g += '<text class="lbl" x="0" y="' + (tempTop + 8) + '">' + tMax + '°</text><text class="lbl" x="0" y="' + (tempTop + tempH) + '">' + tMin + '°</text>';
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" height="' + H + '" aria-hidden="true">' + g + '</svg>';
+}
+function closeDetail(){
+  if (!$("sheet").classList.contains("open")) return;
+  $("sheet").classList.remove("open"); $("sheet").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+  if (lastFocus) lastFocus.focus({preventScroll:true});
+}
+
+/* ===================== events ===================== */
+$("swap").onclick = () => { $("swap").classList.toggle("flip"); update({dir: state.dir === "south" ? "north" : "south"}); };
+$("date").onchange = e => { if (!e.target.value) return; const d = clampTripDate(e.target.value, $("date").min || TRIP_FIRST, $("date").max || TRIP_LAST); if (d !== e.target.value) toast("Trips can leave Nov 23–29"); update({date:d}); };
+$("time").onchange = e => { if (e.target.value) update({time:e.target.value}); };
+$("speed").oninput = e => update({speed:e.target.value});
+$("breaks").onchange = e => update({breaks:e.target.value});
+$("brkEvery").onchange = e => update({brkEvery:e.target.value});
+$("brkLen").onchange = e => update({brkLen:e.target.value});
+$("meal").onclick = e => { const b = e.target.closest(".chip"); if (b) update({meal:b.dataset.v}); };
+$("viewSeg").onclick = e => { const b = e.target.closest("button"); if (b) update({view:b.dataset.view}, {keepScrub:true}); };
+$("matrix").onclick = e => { const c = e.target.closest(".cell"); if (c && !c.disabled) update({date:c.dataset.d, time:hhmm(c.dataset.h)}); };
+const tip = $("tip");
+$("matrix").addEventListener("pointerover", e => {
+  const c = e.target.closest(".cell"); if (!c || e.pointerType !== "mouse" || !grid) return;
+  const r = grid.find(x => x.d === c.dataset.d), cell = r && r.row.find(x => x.h === Number(c.dataset.h)); if (!cell) return;
+  const dep = toMs(cell.d, hhmm(cell.h));
+  tip.innerHTML = '<b>' + fmtDay(dep) + ' · ' + fmtTime(dep) + '</b>' + esc(exposureText(cell.s)) + (cell.s ? '<br>Arrive ' + fmtTime(computeStops(dep).pop().eta) : '') + (cell.best ? '<br>Best that day' : '');
+  const rc = c.getBoundingClientRect();
+  tip.style.left = clamp(rc.left + rc.width / 2 - 110, 8, innerWidth - 248) + "px"; tip.style.top = (rc.top - 74) + "px";
+  tip.classList.add("on");
+});
+$("matrix").addEventListener("pointerout", e => { if (e.target.closest(".cell")) tip.classList.remove("on"); });
+document.addEventListener("scroll", () => tip.classList.remove("on"), {passive:true});
+document.addEventListener("click", e => {
+  const d = e.target.closest("#stopsView [data-detail], #dataView [data-detail]");
+  if (d) openDetail(Number(d.dataset.detail));
+});
+$("refresh").onclick = () => { loadWeather(); loadAlerts(); };
+$("fit").onclick = () => map.fitBounds(L.latLngBounds(geo.pts), {padding:[28, 28]});
+$("play").onclick = togglePlay;
+$("theme").onclick = () => {
+  state.theme = {auto:"light", light:"dark", dark:"auto"}[state.theme];
+  applyTheme(); save(); render(); toast("Theme: " + (state.theme === "auto" ? "match system" : state.theme));
+};
+$("share").onclick = async () => {
+  const url = location.href, title = "Drive Window · " + fmtDay(depMs) + " " + fmtTime(depMs);
+  try {
+    if (navigator.share) { await navigator.share({title, url}); return; }
+    await navigator.clipboard.writeText(url); toast("Link copied");
+  } catch (e) { if (e.name !== "AbortError") toast("Couldn’t share this link"); }
+};
+$("sheet").onclick = e => { if (e.target.id === "sheet") closeDetail(); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDetail(); });
+
+// Ribbon scrubbing: drag or hover with pointer, arrow keys for keyboard.
+const rib = $("ribbon");
+function tFromEvent(e){ if (!RB) return scrubT; const r = rib.getBoundingClientRect(), sx = (e.clientX - r.left) / r.width * RB.W; return clamp((sx - RB.m.l) / RB.pw * T, 0, T); }
+let dragging = false;
+rib.addEventListener("pointerdown", e => { dragging = true; stopPlay(); rib.setPointerCapture(e.pointerId); updateScrub(tFromEvent(e)); });
+rib.addEventListener("pointermove", e => { if (dragging || e.pointerType === "mouse") { if (playing) return; updateScrub(tFromEvent(e)); } });
+rib.addEventListener("pointerup", () => dragging = false);
+rib.addEventListener("pointercancel", () => dragging = false);
+rib.addEventListener("keydown", e => {
+  const step = e.shiftKey ? 30 : 5, k = e.key;
+  if (k === "ArrowRight" || k === "ArrowUp") updateScrub(scrubT + step);
+  else if (k === "ArrowLeft" || k === "ArrowDown") updateScrub(scrubT - step);
+  else if (k === "Home") updateScrub(0); else if (k === "End") updateScrub(T);
+  else if (k === " ") togglePlay(); else return;
+  e.preventDefault();
+});
+new ResizeObserver(() => { if (current.length) { renderRibbon(); updateScrub(scrubT); } }).observe(rib);
+new ResizeObserver(() => map && map.invalidateSize()).observe($("map"));
+
+// Keep it live.
+setInterval(() => { if (!document.hidden) { loadWeather(); loadAlerts(); } }, 30 * 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && (!fetchedAt || Date.now() - fetchedAt > 15 * 60000)) { loadWeather(); loadAlerts(); } });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (state.theme === "auto") render(); });
+
+/* ===================== start ===================== */
+$("legend").innerHTML = ["dry","possible","light","moderate","heavy"].map(k => '<span><i style="background:var(' + CAT[k].v + ')"></i>' + CAT[k].short + '</span>').join("");
+applyTheme(); initMap(); render();
+loadRoute(); loadWeather(); loadAlerts();
+</script>
+</body>
+</html>
